@@ -20,5 +20,6 @@ namespace FluffySpoon.Neuro.Evolution
         Task MutateAsync();
 
         Task<double[]> AskAsync(double[] input);
+        Task TickAsync();
     }
 }

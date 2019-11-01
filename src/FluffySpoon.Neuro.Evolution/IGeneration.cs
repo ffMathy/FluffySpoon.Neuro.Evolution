@@ -17,6 +17,8 @@ namespace FluffySpoon.Neuro.Evolution
 
         IGeneration<TSimulation> Clone();
 
+        Task TickAsync();
+
         void RemoveWorstPerformingGenomes();
 
         void AddGenome(IGenome<TSimulation> genome);

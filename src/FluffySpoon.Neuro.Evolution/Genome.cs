@@ -19,14 +19,13 @@ namespace FluffySpoon.Neuro.Evolution
 
         public Genome(
             INeuralNetwork neuralNetwork,
-            IEvolutionSettings<TSimulation> evolutionSettings,
-            TSimulation model)
+            IEvolutionSettings<TSimulation> evolutionSettings)
         {
             this.basePairs = new Dictionary<double[], double[]>();
 
             this.evolutionSettings = evolutionSettings;
 
-            Simulation = model;
+            Simulation = evolutionSettings.SimulationFactoryMethod();
             NeuralNetwork = neuralNetwork;
         }
 
@@ -106,11 +105,9 @@ namespace FluffySpoon.Neuro.Evolution
                 cloneA, 
                 cloneB);
 
-            var newModel = evolutionSettings.SimulationFactoryMethod();
             return new Genome<TSimulation>(
                 cloneA,
-                evolutionSettings,
-                newModel);
+                evolutionSettings);
         }
 
         private void SwapNeuralNetworkNeuronBiases(
@@ -169,6 +166,17 @@ namespace FluffySpoon.Neuro.Evolution
         {
             if(Simulation is IDisposable disposable)
                 disposable.Dispose();
+        }
+
+        public async Task TickAsync()
+        {
+            if(Simulation.HasEnded)
+                return;
+
+            var inputs = await Simulation.GetInputsAsync();
+            var outputs = await AskAsync(inputs);
+
+            await Simulation.TickAsync(outputs);
         }
     }
 }

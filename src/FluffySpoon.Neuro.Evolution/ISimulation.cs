@@ -8,9 +8,9 @@ namespace FluffySpoon.Neuro.Evolution
     public interface ISimulation
     {
         double Fitness { get; }
+        bool HasEnded { get; }
 
         Task<double[]> GetInputsAsync();
-
         Task TickAsync(double[] outputs);
     }
 }

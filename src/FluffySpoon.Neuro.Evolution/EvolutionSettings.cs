@@ -4,7 +4,7 @@ using System.Text;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public class NeuralNetworkSettings<TSimulation> : IEvolutionSettings<TSimulation>
+    public class EvolutionSettings<TSimulation> : IEvolutionSettings<TSimulation>
     {
         public Random RandomnessProvider { get; set; } = new Random();
 

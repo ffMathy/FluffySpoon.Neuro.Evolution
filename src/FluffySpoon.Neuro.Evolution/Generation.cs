@@ -15,9 +15,14 @@ namespace FluffySpoon.Neuro.Evolution
         public IReadOnlyCollection<IGenome<TSimulation>> Genomes => genomes;
 
         public Generation(
-            IEvolutionSettings<TSimulation> evolutionSettings)
+            IEvolutionSettings<TSimulation> evolutionSettings,
+            IGenomeFactory<TSimulation> genomeFactory)
         {
             genomes = new HashSet<IGenome<TSimulation>>();
+
+            for (var i = 0; i < evolutionSettings.AmountOfGenomesInPopulation; i++)
+                genomes.Add(genomeFactory.Create());
+
             this.evolutionSettings = evolutionSettings;
         }
 
@@ -49,33 +54,39 @@ namespace FluffySpoon.Neuro.Evolution
                 .First();
         }
 
+        public async Task TickAsync()
+        {
+            foreach(var genome in genomes)
+                await genome.TickAsync();
+        }
+
         public async Task<IGeneration<TSimulation>> EvolveAsync()
         {
             var clone = Clone();
-
-            var currentGenomeCount = clone.Genomes.Count;
 
             clone.RemoveWorstPerformingGenomes();
 
             foreach (var genome in clone.Genomes.AsParallel())
                 await genome.EnsureTrainedAsync();
 
-            await BreedNewGenomesAsync(clone, currentGenomeCount);
+            await BreedNewGenomesAsync(clone);
 
             return clone;
         }
 
-        private static async Task BreedNewGenomesAsync(
-            IGeneration<TSimulation> sourceGeneration, 
-            int targetGenomeCount)
+        private async Task BreedNewGenomesAsync(
+            IGeneration<TSimulation> sourceGeneration)
         {
-            while (sourceGeneration.Genomes.Count < targetGenomeCount)
-            {
-                var crossOver = await sourceGeneration.CrossTwoRandomGenomesAsync();
-                await crossOver.MutateAsync();
+            while (sourceGeneration.Genomes.Count < evolutionSettings.AmountOfGenomesInPopulation)
+                await BreedNewGenomeAsync(sourceGeneration);
+        }
 
-                sourceGeneration.AddGenome(crossOver);
-            }
+        private static async Task BreedNewGenomeAsync(IGeneration<TSimulation> sourceGeneration)
+        {
+            var crossOver = await sourceGeneration.CrossTwoRandomGenomesAsync();
+            await crossOver.MutateAsync();
+
+            sourceGeneration.AddGenome(crossOver);
         }
 
         public void RemoveWorstPerformingGenomes()
@@ -83,13 +94,16 @@ namespace FluffySpoon.Neuro.Evolution
             var worstPerformingGenomes = genomes
                 .OrderByDescending(x => x.Simulation.Fitness)
                 .Take(evolutionSettings.AmountOfWorstGenomesToRemovePerGeneration);
-            foreach(var genome in worstPerformingGenomes)
+
+            foreach (var genome in worstPerformingGenomes)
                 RemoveGenome(genome);
         }
 
         public IGeneration<TSimulation> Clone()
         {
-            return new Generation<TSimulation>(evolutionSettings)
+            return new Generation<TSimulation>(
+                evolutionSettings,
+                null)
             {
                 genomes = genomes
             };

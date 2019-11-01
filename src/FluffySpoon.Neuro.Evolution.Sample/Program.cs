@@ -10,7 +10,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample
         static async Task Main(string[] args)
         {
             var serviceCollection = new ServiceCollection();
-            serviceCollection.AddFluffySpoonNeuroEvolution(new NeuralNetworkSettings<CarSimulation>() {
+            serviceCollection.AddFluffySpoonNeuroEvolution(new EvolutionSettings<CarSimulation>() {
                 AmountOfGenomesInPopulation = 100,
                 AmountOfWorstGenomesToRemovePerGeneration = 10,
 
@@ -55,6 +55,8 @@ namespace FluffySpoon.Neuro.Evolution.Sample
 
         public double Fitness => -DistanceTravelled;
 
+        public bool HasEnded => DistanceTravelled > 10;
+
         /// <summary>
         /// This is called by the learning algorithm to determine the inputs to feed into the neural network.
         /// </summary>
@@ -82,6 +84,9 @@ namespace FluffySpoon.Neuro.Evolution.Sample
             var accelerationType = NeuronInterpretationHelper.InterpretAsEnum<AccelerationType>(outputs[1]);
 
             //do something here based on the steering type and acceleration type the neural net suggested.
+
+            if(accelerationType == AccelerationType.Accelerate)
+                DistanceTravelled++;
         }
     }
 }
