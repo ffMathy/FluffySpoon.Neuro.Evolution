@@ -12,5 +12,7 @@ namespace FluffySpoon.Neuro.Evolution
         Task<IGenome> CrossWithAsync(IGenome other);
 
         Task MutateAsync();
+
+        Task<double[]> AskAsync(double[] input);
     }
 }
