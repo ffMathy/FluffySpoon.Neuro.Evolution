@@ -26,6 +26,12 @@ namespace FluffySpoon.Neuro.Evolution
             this.evolutionSettings = evolutionSettings;
         }
 
+        public async Task<INeuron[]> GetTrainedNeuronsAsync()
+        {
+            await TrainIfNeededAsync();
+            return neuralNetwork.GetAllNeurons();
+        }
+
         public void AddBasePair(double[] inputs, double[] expectedOutputs)
         {
             hasTrained = false;
@@ -83,9 +89,46 @@ namespace FluffySpoon.Neuro.Evolution
             return value * (random.NextDouble() - 0.5) * 3 + (random.NextDouble() - 0.5);
         }
 
-        public void CrossWith(IGenome other)
+        public async Task CrossWithAsync(IGenome other)
         {
-            
+            var neuronsA = await GetTrainedNeuronsAsync();
+            var neuronsB = await other.GetTrainedNeuronsAsync();
+
+            RandomSwap(ref neuronsA, ref neuronsB);
+
+            var slicePoint = evolutionSettings.RandomnessProvider.Next(0, neuronsA.Length + 1);
+            for (var i = slicePoint; i < neuronsA.Length; i++)
+            {
+                SwapNeuronBiases(
+                    neuronsA,
+                    neuronsB,
+                    i);
+            }
+        }
+
+        private static void Swap<T>(ref T a, ref T b)
+        {
+            var temporary = a;
+            a = b;
+            b = temporary;
+        }
+
+        private void RandomSwap<T>(ref T a, ref T b)
+        {
+            if (evolutionSettings.RandomnessProvider.NextDouble() <= 0.5)
+                return;
+
+            Swap(ref a, ref b);
+        }
+
+        private static void SwapNeuronBiases(
+            IReadOnlyList<INeuron> aNetworkNeurons,
+            IReadOnlyList<INeuron> bNetworkNeurons,
+            int i)
+        {
+            var temporary = aNetworkNeurons[i].Bias;
+            aNetworkNeurons[i].Bias = bNetworkNeurons[i].Bias;
+            bNetworkNeurons[i].Bias = temporary;
         }
 
         public void SwapWith(IGenome other)
