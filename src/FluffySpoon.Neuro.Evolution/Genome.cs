@@ -176,6 +176,8 @@ namespace FluffySpoon.Neuro.Evolution
             var inputs = await Simulation.GetInputsAsync();
             var outputs = await AskAsync(inputs);
 
+            AddBasePair(inputs, outputs);
+
             await Simulation.TickAsync(outputs);
         }
     }
