@@ -10,7 +10,8 @@ namespace FluffySpoon.Neuro.Evolution
         void AddBasePair(double[] inputs, double[] outputs);
         void RemoveBasePair(double[] inputs);
 
-        Task<IGenome> CrossWithAsync(IGenome other);
+        void CrossWith(IGenome other);
+        void SwapWith(IGenome other);
 
         Task MutateAsync();
 
