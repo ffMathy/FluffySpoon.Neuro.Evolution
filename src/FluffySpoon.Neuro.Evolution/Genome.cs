@@ -7,29 +7,30 @@ using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public class Genome : IGenome
+    public class Genome<TModel> : IGenome<TModel> where TModel : IModel<TModel>
     {
-        public delegate double CalculateFitnessOfGenomeDelegate();
-
         private readonly IDictionary<double[], double[]> basePairs;
-        private readonly IEvolutionSettings evolutionSettings;
-
-        private readonly CalculateFitnessOfGenomeDelegate genomeFitnessCalculationFunction;
+        private readonly IEvolutionSettings<TModel> evolutionSettings;
 
         private bool hasTrained;
 
         public INeuralNetwork NeuralNetwork { get; }
 
+        public double Fitness => 
+            evolutionSettings.FitnessCalculationFunction(Model);
+
+        public TModel Model { get; }
+
         public Genome(
             INeuralNetwork neuralNetwork,
-            IEvolutionSettings evolutionSettings,
-            CalculateFitnessOfGenomeDelegate genomeFitnessCalculationFunction)
+            IEvolutionSettings<TModel> evolutionSettings,
+            TModel model)
         {
             this.basePairs = new Dictionary<double[], double[]>();
 
             this.evolutionSettings = evolutionSettings;
-            this.genomeFitnessCalculationFunction = genomeFitnessCalculationFunction;
 
+            Model = model;
             NeuralNetwork = neuralNetwork;
         }
 
@@ -90,9 +91,9 @@ namespace FluffySpoon.Neuro.Evolution
             return value * (random.NextDouble() - 0.5) * 3 + (random.NextDouble() - 0.5);
         }
 
-        public async Task<IGenome> CrossWithAsync(IGenome other)
+        public async Task<IGenome<TModel>> CrossWithAsync(IGenome<TModel> other)
         {
-            var a = (IGenome)this;
+            var a = (IGenome<TModel>)this;
             var b = other;
 
             RandomSwap(
@@ -105,6 +106,21 @@ namespace FluffySpoon.Neuro.Evolution
             var cloneA = await a.NeuralNetwork.CloneAsync();
             var cloneB = await b.NeuralNetwork.CloneAsync();
 
+            SwapNeuralNetworkNeuronBiases(
+                cloneA, 
+                cloneB);
+
+            var newModel = await a.Model.CreateNew();
+            return new Genome<TModel>(
+                cloneA,
+                evolutionSettings,
+                newModel);
+        }
+
+        private void SwapNeuralNetworkNeuronBiases(
+            INeuralNetwork cloneA, 
+            INeuralNetwork cloneB)
+        {
             var neuronsA = cloneA.GetAllNeurons();
             var neuronsB = cloneB.GetAllNeurons();
 
@@ -116,11 +132,26 @@ namespace FluffySpoon.Neuro.Evolution
                     neuronsB,
                     i);
             }
+        }
 
-            return new Genome(
-                cloneA,
-                evolutionSettings,
-                null);
+        private static void SwapNeuronBiases(
+            IReadOnlyList<INeuron> aNetworkNeurons,
+            IReadOnlyList<INeuron> bNetworkNeurons,
+            int i)
+        {
+            var temporary = aNetworkNeurons[i].Bias;
+            aNetworkNeurons[i].Bias = bNetworkNeurons[i].Bias;
+            bNetworkNeurons[i].Bias = temporary;
+        }
+
+        public async Task SwapWithAsync(IGenome<TModel> other)
+        {
+            await EnsureTrainedAsync();
+            await other.EnsureTrainedAsync();
+
+            SwapNeuralNetworkNeuronBiases(
+                NeuralNetwork,
+                other.NeuralNetwork);
         }
 
         private static void Swap<T>(ref T a, ref T b)
@@ -136,21 +167,6 @@ namespace FluffySpoon.Neuro.Evolution
                 return;
 
             Swap(ref a, ref b);
-        }
-
-        private static void SwapNeuronBiases(
-            IReadOnlyList<INeuron> aNetworkNeurons,
-            IReadOnlyList<INeuron> bNetworkNeurons,
-            int i)
-        {
-            var temporary = aNetworkNeurons[i].Bias;
-            aNetworkNeurons[i].Bias = bNetworkNeurons[i].Bias;
-            bNetworkNeurons[i].Bias = temporary;
-        }
-
-        public void SwapWith(IGenome other)
-        {
-            throw new NotImplementedException();
         }
     }
 }
