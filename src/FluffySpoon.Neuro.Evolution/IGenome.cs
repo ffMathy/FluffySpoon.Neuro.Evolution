@@ -7,14 +7,16 @@ namespace FluffySpoon.Neuro.Evolution
 {
     public interface IGenome
     {
+        INeuralNetwork NeuralNetwork { get; }
+
         void AddBasePair(double[] inputs, double[] outputs);
         void RemoveBasePair(double[] inputs);
 
-        Task CrossWithAsync(IGenome other);
+        Task<IGenome> CrossWithAsync(IGenome other);
+        Task EnsureTrainedAsync();
+
         void SwapWith(IGenome other);
         Task MutateAsync();
-
-        Task<INeuron[]> GetTrainedNeuronsAsync();
 
         Task<double[]> AskAsync(double[] input);
     }

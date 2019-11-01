@@ -9,5 +9,6 @@ namespace FluffySpoon.Neuro.Evolution
         Random RandomnessProvider { get; }
 
         double NeuronMutationProbability { get; }
+        int? BadGenerationsToRemove { get; }
     }
 }

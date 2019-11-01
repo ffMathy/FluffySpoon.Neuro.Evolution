@@ -7,16 +7,17 @@ namespace FluffySpoon.Neuro.Evolution
 {
     public interface IGeneration
     {
-        IGenome[] Genomes { get; }
+        IReadOnlyCollection<IGenome> Genomes { get; }
 
-        Task<IGeneration> EvolveAsync(
-            int? genomesToRemove);
+        Task<IGeneration> EvolveAsync();
 
         Task<IGenome> CrossTwoRandomGenomesAsync();
         
         IGenome PickRandomGenome();
 
-        void RemoveWorstPerformingGenomes(int? amount);
+        IGeneration Clone();
+
+        void RemoveWorstPerformingGenomes();
 
         void AddGenome(IGenome genome);
         void RemoveGenome(IGenome genome);

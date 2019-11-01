@@ -9,27 +9,28 @@ namespace FluffySpoon.Neuro.Evolution
 {
     public class Genome : IGenome
     {
-        private readonly IDictionary<double[], double[]> basePairs;
+        public delegate double CalculateFitnessOfGenomeDelegate();
 
-        private readonly INeuralNetwork neuralNetwork;
+        private readonly IDictionary<double[], double[]> basePairs;
         private readonly IEvolutionSettings evolutionSettings;
+
+        private readonly CalculateFitnessOfGenomeDelegate genomeFitnessCalculationFunction;
 
         private bool hasTrained;
 
+        public INeuralNetwork NeuralNetwork { get; }
+
         public Genome(
             INeuralNetwork neuralNetwork,
-            IEvolutionSettings evolutionSettings)
+            IEvolutionSettings evolutionSettings,
+            CalculateFitnessOfGenomeDelegate genomeFitnessCalculationFunction)
         {
             this.basePairs = new Dictionary<double[], double[]>();
 
-            this.neuralNetwork = neuralNetwork;
             this.evolutionSettings = evolutionSettings;
-        }
+            this.genomeFitnessCalculationFunction = genomeFitnessCalculationFunction;
 
-        public async Task<INeuron[]> GetTrainedNeuronsAsync()
-        {
-            await TrainIfNeededAsync();
-            return neuralNetwork.GetAllNeurons();
+            NeuralNetwork = neuralNetwork;
         }
 
         public void AddBasePair(double[] inputs, double[] expectedOutputs)
@@ -46,28 +47,28 @@ namespace FluffySpoon.Neuro.Evolution
 
         public async Task<double[]> AskAsync(double[] input)
         {
-            await TrainIfNeededAsync();
-            return neuralNetwork.Ask(input);
+            await EnsureTrainedAsync();
+            return NeuralNetwork.Ask(input);
         }
 
-        private async Task TrainIfNeededAsync()
+        public async Task EnsureTrainedAsync()
         {
             if (hasTrained)
                 return;
 
-            neuralNetwork.WipeAllTraining();
+            NeuralNetwork.WipeAllTraining();
 
-            await neuralNetwork.TrainAsync(basePairs.Keys, basePairs.Values);
+            await NeuralNetwork.TrainAsync(basePairs.Keys, basePairs.Values);
             hasTrained = true;
         }
 
         public async Task MutateAsync()
         {
-            await TrainIfNeededAsync();
+            await EnsureTrainedAsync();
 
             var random = evolutionSettings.RandomnessProvider;
 
-            var neurons = neuralNetwork.GetAllNeurons(); 
+            var neurons = NeuralNetwork.GetAllNeurons();
             foreach (var neuron in neurons)
             {
                 if (random.NextDouble() < evolutionSettings.NeuronMutationProbability)
@@ -89,21 +90,37 @@ namespace FluffySpoon.Neuro.Evolution
             return value * (random.NextDouble() - 0.5) * 3 + (random.NextDouble() - 0.5);
         }
 
-        public async Task CrossWithAsync(IGenome other)
+        public async Task<IGenome> CrossWithAsync(IGenome other)
         {
-            var neuronsA = await GetTrainedNeuronsAsync();
-            var neuronsB = await other.GetTrainedNeuronsAsync();
+            var a = (IGenome)this;
+            var b = other;
 
-            RandomSwap(ref neuronsA, ref neuronsB);
+            RandomSwap(
+                ref a,
+                ref b);
 
-            var slicePoint = evolutionSettings.RandomnessProvider.Next(0, neuronsA.Length + 1);
-            for (var i = slicePoint; i < neuronsA.Length; i++)
+            await a.EnsureTrainedAsync();
+            await b.EnsureTrainedAsync();
+
+            var cloneA = await a.NeuralNetwork.CloneAsync();
+            var cloneB = await b.NeuralNetwork.CloneAsync();
+
+            var neuronsA = cloneA.GetAllNeurons();
+            var neuronsB = cloneB.GetAllNeurons();
+
+            var slicePoint = evolutionSettings.RandomnessProvider.Next(0, neuronsA.Count + 1);
+            for (var i = slicePoint; i < neuronsA.Count; i++)
             {
                 SwapNeuronBiases(
                     neuronsA,
                     neuronsB,
                     i);
             }
+
+            return new Genome(
+                cloneA,
+                evolutionSettings,
+                null);
         }
 
         private static void Swap<T>(ref T a, ref T b)
