@@ -5,19 +5,16 @@ using System.Text;
 namespace FluffySpoon.Neuro.Evolution
 {
     public delegate double CalculateFitnessOfModelDelegate<TModel>(TModel model);
+    public delegate TModel CreateNewModelDelegate<TModel>();
 
     public interface IEvolutionSettings<TModel> : INeuralNetworkSettings
     {
         Random RandomnessProvider { get; }
 
-        int? BadGenerationsToRemove { get; }
+        int AmountOfWorstGenomesToRemovePerGeneration { get; }
+        int AmountOfGenomesInPopulation { get; }
 
-        CalculateFitnessOfModelDelegate<TModel> FitnessCalculationFunction { get; }
-    }
-
-    public interface INeuralNetworkSettings
-    {
-        double NeuronMutationProbability { get; }
-        int[] NeuronCounts { get; }
+        CalculateFitnessOfModelDelegate<TModel> FitnessCalculationMethod { get; }
+        CreateNewModelDelegate<TModel> ModelFactoryMethod { get; }
     }
 }

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public class Genome<TModel> : IGenome<TModel> where TModel : IModel<TModel>
+    public class Genome<TModel> : IGenome<TModel>
     {
         private readonly IDictionary<double[], double[]> basePairs;
         private readonly IEvolutionSettings<TModel> evolutionSettings;
@@ -17,7 +17,7 @@ namespace FluffySpoon.Neuro.Evolution
         public INeuralNetwork NeuralNetwork { get; }
 
         public double Fitness => 
-            evolutionSettings.FitnessCalculationFunction(Model);
+            evolutionSettings.FitnessCalculationMethod(Model);
 
         public TModel Model { get; }
 
@@ -110,7 +110,7 @@ namespace FluffySpoon.Neuro.Evolution
                 cloneA, 
                 cloneB);
 
-            var newModel = await a.Model.CreateNew();
+            var newModel = evolutionSettings.ModelFactoryMethod();
             return new Genome<TModel>(
                 cloneA,
                 evolutionSettings,

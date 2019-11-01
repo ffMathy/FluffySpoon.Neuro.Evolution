@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public interface IGeneration<TModel> where TModel : IModel<TModel>
+    public interface IGeneration<TModel>
     {
         IReadOnlyCollection<IGenome<TModel>> Genomes { get; }
 

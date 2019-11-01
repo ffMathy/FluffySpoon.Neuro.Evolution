@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public class Generation<TModel> : IGeneration<TModel> where TModel : IModel<TModel>
+    public class Generation<TModel> : IGeneration<TModel>
     {
         private readonly IEvolutionSettings<TModel> evolutionSettings;
 

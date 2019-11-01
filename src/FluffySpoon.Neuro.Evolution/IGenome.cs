@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public interface IGenome<TModel> where TModel : IModel<TModel>
+    public interface IGenome<TModel>
     {
         double Fitness { get; }
 
