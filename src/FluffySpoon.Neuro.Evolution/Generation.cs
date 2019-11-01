@@ -6,32 +6,33 @@ using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public class Generation<TModel> : IGeneration<TModel>
+    public class Generation<TSimulation> : IGeneration<TSimulation> where TSimulation : ISimulation
     {
-        private readonly IEvolutionSettings<TModel> evolutionSettings;
+        private readonly IEvolutionSettings<TSimulation> evolutionSettings;
 
-        private HashSet<IGenome<TModel>> genomes;
+        private HashSet<IGenome<TSimulation>> genomes;
 
-        public IReadOnlyCollection<IGenome<TModel>> Genomes => genomes;
+        public IReadOnlyCollection<IGenome<TSimulation>> Genomes => genomes;
 
         public Generation(
-            IEvolutionSettings<TModel> evolutionSettings)
+            IEvolutionSettings<TSimulation> evolutionSettings)
         {
-            genomes = new HashSet<IGenome<TModel>>();
+            genomes = new HashSet<IGenome<TSimulation>>();
             this.evolutionSettings = evolutionSettings;
         }
 
-        public void AddGenome(IGenome<TModel> genome)
+        public void AddGenome(IGenome<TSimulation> genome)
         {
             genomes.Add(genome);
         }
 
-        public void RemoveGenome(IGenome<TModel> genome)
+        public void RemoveGenome(IGenome<TSimulation> genome)
         {
             genomes.Remove(genome);
+            genome.Dispose();
         }
 
-        public async Task<IGenome<TModel>> CrossTwoRandomGenomesAsync()
+        public async Task<IGenome<TSimulation>> CrossTwoRandomGenomesAsync()
         {
             var randomGenome1 = PickRandomGenome();
             var randomGenome2 = PickRandomGenome();
@@ -40,7 +41,7 @@ namespace FluffySpoon.Neuro.Evolution
             return crossOverSimulation;
         }
 
-        public IGenome<TModel> PickRandomGenome()
+        public IGenome<TSimulation> PickRandomGenome()
         {
             var random = evolutionSettings.RandomnessProvider;
             return genomes
@@ -48,7 +49,7 @@ namespace FluffySpoon.Neuro.Evolution
                 .First();
         }
 
-        public async Task<IGeneration<TModel>> EvolveAsync()
+        public async Task<IGeneration<TSimulation>> EvolveAsync()
         {
             var clone = Clone();
 
@@ -65,7 +66,7 @@ namespace FluffySpoon.Neuro.Evolution
         }
 
         private static async Task BreedNewGenomesAsync(
-            IGeneration<TModel> sourceGeneration, 
+            IGeneration<TSimulation> sourceGeneration, 
             int targetGenomeCount)
         {
             while (sourceGeneration.Genomes.Count < targetGenomeCount)
@@ -79,13 +80,16 @@ namespace FluffySpoon.Neuro.Evolution
 
         public void RemoveWorstPerformingGenomes()
         {
-            //var worstPerformingGenomes = genomes
-            //    .OrderByDescending(x => x.Fitness);
+            var worstPerformingGenomes = genomes
+                .OrderByDescending(x => x.Simulation.Fitness)
+                .Take(evolutionSettings.AmountOfWorstGenomesToRemovePerGeneration);
+            foreach(var genome in worstPerformingGenomes)
+                RemoveGenome(genome);
         }
 
-        public IGeneration<TModel> Clone()
+        public IGeneration<TSimulation> Clone()
         {
-            return new Generation<TModel>(evolutionSettings)
+            return new Generation<TSimulation>(evolutionSettings)
             {
                 genomes = genomes
             };

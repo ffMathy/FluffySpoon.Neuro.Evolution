@@ -7,30 +7,26 @@ using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public class Genome<TModel> : IGenome<TModel>
+    public class Genome<TSimulation> : IGenome<TSimulation> where TSimulation : ISimulation
     {
         private readonly IDictionary<double[], double[]> basePairs;
-        private readonly IEvolutionSettings<TModel> evolutionSettings;
+        private readonly IEvolutionSettings<TSimulation> evolutionSettings;
 
         private bool hasTrained;
 
         public INeuralNetwork NeuralNetwork { get; }
-
-        public double Fitness => 
-            evolutionSettings.FitnessCalculationMethod(Model);
-
-        public TModel Model { get; }
+        public TSimulation Simulation { get; }
 
         public Genome(
             INeuralNetwork neuralNetwork,
-            IEvolutionSettings<TModel> evolutionSettings,
-            TModel model)
+            IEvolutionSettings<TSimulation> evolutionSettings,
+            TSimulation model)
         {
             this.basePairs = new Dictionary<double[], double[]>();
 
             this.evolutionSettings = evolutionSettings;
 
-            Model = model;
+            Simulation = model;
             NeuralNetwork = neuralNetwork;
         }
 
@@ -91,9 +87,9 @@ namespace FluffySpoon.Neuro.Evolution
             return value * (random.NextDouble() - 0.5) * 3 + (random.NextDouble() - 0.5);
         }
 
-        public async Task<IGenome<TModel>> CrossWithAsync(IGenome<TModel> other)
+        public async Task<IGenome<TSimulation>> CrossWithAsync(IGenome<TSimulation> other)
         {
-            var a = (IGenome<TModel>)this;
+            var a = (IGenome<TSimulation>)this;
             var b = other;
 
             RandomSwap(
@@ -110,8 +106,8 @@ namespace FluffySpoon.Neuro.Evolution
                 cloneA, 
                 cloneB);
 
-            var newModel = evolutionSettings.ModelFactoryMethod();
-            return new Genome<TModel>(
+            var newModel = evolutionSettings.SimulationFactoryMethod();
+            return new Genome<TSimulation>(
                 cloneA,
                 evolutionSettings,
                 newModel);
@@ -144,7 +140,7 @@ namespace FluffySpoon.Neuro.Evolution
             bNetworkNeurons[i].Bias = temporary;
         }
 
-        public async Task SwapWithAsync(IGenome<TModel> other)
+        public async Task SwapWithAsync(IGenome<TSimulation> other)
         {
             await EnsureTrainedAsync();
             await other.EnsureTrainedAsync();
@@ -167,6 +163,12 @@ namespace FluffySpoon.Neuro.Evolution
                 return;
 
             Swap(ref a, ref b);
+        }
+
+        public void Dispose()
+        {
+            if(Simulation is IDisposable disposable)
+                disposable.Dispose();
         }
     }
 }

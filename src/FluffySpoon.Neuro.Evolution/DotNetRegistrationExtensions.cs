@@ -7,7 +7,7 @@ namespace FluffySpoon.Neuro.Evolution
 {
     public static class DotNetRegistrationExtensions
     {
-        public static void AddFluffySpoonNeuroEvolution<TModel>(this IServiceCollection services, NeuralNetworkSettings<TModel> neuralNetworkSettings)
+        public static void AddFluffySpoonNeuroEvolution<TSimulation>(this IServiceCollection services, NeuralNetworkSettings<TSimulation> neuralNetworkSettings)
         {
 
         }

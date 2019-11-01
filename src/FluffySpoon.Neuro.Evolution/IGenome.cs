@@ -5,21 +5,18 @@ using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public interface IGenome<TModel>
+    public interface IGenome<TSimulation> : IDisposable where TSimulation : ISimulation
     {
-        double Fitness { get; }
-
-        TModel Model { get; }
-
+        TSimulation Simulation { get; }
         INeuralNetwork NeuralNetwork { get; }
 
         void AddBasePair(double[] inputs, double[] outputs);
         void RemoveBasePair(double[] inputs);
 
-        Task<IGenome<TModel>> CrossWithAsync(IGenome<TModel> other);
+        Task<IGenome<TSimulation>> CrossWithAsync(IGenome<TSimulation> other);
         Task EnsureTrainedAsync();
 
-        Task SwapWithAsync(IGenome<TModel> other);
+        Task SwapWithAsync(IGenome<TSimulation> other);
         Task MutateAsync();
 
         Task<double[]> AskAsync(double[] input);

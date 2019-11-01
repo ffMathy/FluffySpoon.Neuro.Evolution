@@ -5,21 +5,21 @@ using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public interface IGeneration<TModel>
+    public interface IGeneration<TSimulation> where TSimulation : ISimulation
     {
-        IReadOnlyCollection<IGenome<TModel>> Genomes { get; }
+        IReadOnlyCollection<IGenome<TSimulation>> Genomes { get; }
 
-        Task<IGeneration<TModel>> EvolveAsync();
+        Task<IGeneration<TSimulation>> EvolveAsync();
 
-        Task<IGenome<TModel>> CrossTwoRandomGenomesAsync();
+        Task<IGenome<TSimulation>> CrossTwoRandomGenomesAsync();
         
-        IGenome<TModel> PickRandomGenome();
+        IGenome<TSimulation> PickRandomGenome();
 
-        IGeneration<TModel> Clone();
+        IGeneration<TSimulation> Clone();
 
         void RemoveWorstPerformingGenomes();
 
-        void AddGenome(IGenome<TModel> genome);
-        void RemoveGenome(IGenome<TModel> genome);
+        void AddGenome(IGenome<TSimulation> genome);
+        void RemoveGenome(IGenome<TSimulation> genome);
     }
 }

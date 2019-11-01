@@ -4,15 +4,14 @@ using System.Text;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public class NeuralNetworkSettings<TModel> : IEvolutionSettings<TModel>
+    public class NeuralNetworkSettings<TSimulation> : IEvolutionSettings<TSimulation>
     {
         public Random RandomnessProvider { get; set; } = new Random();
 
         public int AmountOfWorstGenomesToRemovePerGeneration { get; set; }
         public int AmountOfGenomesInPopulation { get; set; }
 
-        public CalculateFitnessOfModelDelegate<TModel> FitnessCalculationMethod { get; set; }
-        public CreateNewModelDelegate<TModel> ModelFactoryMethod { get; set; }
+        public CreateNewModelDelegate<TSimulation> SimulationFactoryMethod { get; set; }
 
         public double NeuronMutationProbability { get; set; } = 0.2;
 
