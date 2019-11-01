@@ -1,6 +1,8 @@
 ﻿using Accord.Neuro;
+using Accord.Neuro.Learning;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,38 +12,68 @@ namespace FluffySpoon.Neuro.Evolution
     class AccordNeuralNetwork : INeuralNetwork
     {
         private readonly ActivationNetwork network;
+        private readonly BackPropagationLearning teacher;
 
-        public AccordNeuralNetwork(INeuralNetworkSettings neuralNetworkSettings)
+        private readonly INeuralNetworkSettings neuralNetworkSettings;
+
+        public AccordNeuralNetwork(
+            INeuralNetworkSettings neuralNetworkSettings,
+            ActivationNetwork activationNetwork)
         {
-            this.network = new ActivationNetwork(
+            this.network = activationNetwork ?? new ActivationNetwork(
                 new ThresholdFunction(),
                 neuralNetworkSettings.NeuronCounts[0],
                 neuralNetworkSettings.NeuronCounts.Skip(1).ToArray());
+
+            this.teacher = new BackPropagationLearning(this.network);
+            this.neuralNetworkSettings = neuralNetworkSettings;
         }
 
         public double[] Ask(double[] input)
         {
-            throw new NotImplementedException();
+            return network.Compute(input);
         }
 
         public Task<INeuralNetwork> CloneAsync()
         {
-            throw new NotImplementedException();
+            return Task.FromResult<INeuralNetwork>(
+                new AccordNeuralNetwork(
+                    neuralNetworkSettings,
+                    Copy(this.network)));
+        }
+
+        private ActivationNetwork Copy(ActivationNetwork network)
+        {
+            using (var memoryStream = new MemoryStream())
+            {
+                network.Save(memoryStream);
+                memoryStream.Position = 0;
+
+                return (ActivationNetwork)Network.Load(memoryStream);
+            }
         }
 
         public IReadOnlyList<INeuron> GetAllNeurons()
         {
-            throw new NotImplementedException();
+            return network.Layers
+                .SelectMany(x => x.Neurons)
+                .Cast<ActivationNeuron>()
+                .Select(x => new AccordNeuronAdapter(x))
+                .ToArray();
         }
 
         public Task TrainAsync(IEnumerable<double[]> input, IEnumerable<double[]> expectedOutput)
         {
-            throw new NotImplementedException();
+            teacher.RunEpoch(
+                input.ToArray(), 
+                expectedOutput.ToArray());
+
+            return Task.CompletedTask;
         }
 
         public void WipeAllTraining()
         {
-            throw new NotImplementedException();
+            this.network.Randomize();
         }
     }
 }
