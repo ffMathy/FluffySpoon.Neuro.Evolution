@@ -7,7 +7,7 @@ namespace FluffySpoon.Neuro.Evolution
 {
     public class Genome : IGenome
     {
-        private readonly IDictionary<double[], double[]> dnaStrings;
+        private readonly IDictionary<double[], double[]> dnaStringChains;
         private readonly Func<double> fitnessCalculationFunction;
 
         public Genome(
@@ -15,12 +15,12 @@ namespace FluffySpoon.Neuro.Evolution
         {
             this.fitnessCalculationFunction = fitnessCalculationFunction;
 
-            dnaStrings = new Dictionary<double[], double[]>();
+            this.dnaStringChains = new Dictionary<double[], double[]>();
         }
 
-        public Task AddChainAsync(double[] inputs, double[] outputs)
+        public void AddBasePair(double[] inputs, double[] outputs)
         {
-            throw new NotImplementedException();
+            dnaStringChains.Add(inputs, outputs);
         }
 
         public Task<double[]> AskAsync(double[] input)
@@ -36,6 +36,11 @@ namespace FluffySpoon.Neuro.Evolution
         public Task MutateAsync()
         {
             throw new NotImplementedException();
+        }
+
+        public void RemoveBasePair(double[] inputs)
+        {
+            dnaStringChains.Remove(inputs);
         }
     }
 }

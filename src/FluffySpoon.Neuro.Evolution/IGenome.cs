@@ -7,7 +7,8 @@ namespace FluffySpoon.Neuro.Evolution
 {
     public interface IGenome
     {
-        Task AddChainAsync(double[] inputs, double[] outputs);
+        void AddBasePair(double[] inputs, double[] outputs);
+        void RemoveBasePair(double[] inputs);
 
         Task<IGenome> CrossWithAsync(IGenome other);
 
