@@ -6,13 +6,18 @@ namespace FluffySpoon.Neuro.Evolution
 {
     public delegate double CalculateFitnessOfModelDelegate<TModel>(TModel model);
 
-    public interface IEvolutionSettings<TModel>
+    public interface IEvolutionSettings<TModel> : INeuralNetworkSettings
     {
         Random RandomnessProvider { get; }
 
-        double NeuronMutationProbability { get; }
         int? BadGenerationsToRemove { get; }
 
         CalculateFitnessOfModelDelegate<TModel> FitnessCalculationFunction { get; }
+    }
+
+    public interface INeuralNetworkSettings
+    {
+        double NeuronMutationProbability { get; }
+        int[] NeuronCounts { get; }
     }
 }
