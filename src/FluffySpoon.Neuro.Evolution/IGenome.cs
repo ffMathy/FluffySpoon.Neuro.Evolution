@@ -17,7 +17,7 @@ namespace FluffySpoon.Neuro.Evolution
         Task EnsureTrainedAsync();
 
         Task SwapWithAsync(IGenome<TSimulation> other);
-        Task MutateAsync();
+        Task MutateAsync(double mutationProbability);
 
         Task<double[]> AskAsync(double[] input);
         Task TickAsync();

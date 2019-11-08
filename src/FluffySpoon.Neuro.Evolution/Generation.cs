@@ -94,10 +94,10 @@ namespace FluffySpoon.Neuro.Evolution
                 await BreedNewGenomeAsync(sourceGeneration);
         }
 
-        private static async Task BreedNewGenomeAsync(IGeneration<TSimulation> sourceGeneration)
+        private async Task BreedNewGenomeAsync(IGeneration<TSimulation> sourceGeneration)
         {
             var crossOver = await sourceGeneration.CrossTwoRandomGenomesAsync();
-            await crossOver.MutateAsync();
+            await crossOver.MutateAsync(evolutionSettings.NeuronMutationProbability);
 
             sourceGeneration.AddGenome(crossOver);
         }

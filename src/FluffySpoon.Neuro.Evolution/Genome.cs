@@ -27,6 +27,9 @@ namespace FluffySpoon.Neuro.Evolution
 
             Simulation = evolutionSettings.SimulationFactoryMethod();
             NeuralNetwork = neuralNetwork;
+
+            foreach(var neuron in neuralNetwork.GetAllNeurons())
+                MutateNeuron(neuron);
         }
 
         public void AddBasePair(double[] inputs, double[] expectedOutputs)
@@ -58,7 +61,7 @@ namespace FluffySpoon.Neuro.Evolution
             hasTrained = true;
         }
 
-        public async Task MutateAsync()
+        public async Task MutateAsync(double mutationProbability)
         {
             await EnsureTrainedAsync();
 
@@ -67,15 +70,20 @@ namespace FluffySpoon.Neuro.Evolution
             var neurons = NeuralNetwork.GetAllNeurons();
             foreach (var neuron in neurons)
             {
-                if (random.NextDouble() > evolutionSettings.NeuronMutationProbability)
+                if (random.NextDouble() < mutationProbability)
                     continue;
 
-                neuron.Bias = MutateNeuronValue(neuron.Bias);
-
-                neuron.Weights = neuron.Weights
-                    .Select(MutateNeuronValue)
-                    .ToImmutableArray();
+                MutateNeuron(neuron);
             }
+        }
+
+        private void MutateNeuron(INeuron neuron)
+        {
+            neuron.Bias = MutateNeuronValue(neuron.Bias);
+
+            neuron.Weights = neuron.Weights
+                .Select(MutateNeuronValue)
+                .ToImmutableArray();
         }
 
         private double MutateNeuronValue(double value)
