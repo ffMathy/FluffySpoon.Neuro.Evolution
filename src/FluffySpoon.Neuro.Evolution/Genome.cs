@@ -67,7 +67,7 @@ namespace FluffySpoon.Neuro.Evolution
             var neurons = NeuralNetwork.GetAllNeurons();
             foreach (var neuron in neurons)
             {
-                if (random.NextDouble() < evolutionSettings.NeuronMutationProbability)
+                if (random.NextDouble() > evolutionSettings.NeuronMutationProbability)
                     continue;
 
                 neuron.Bias = MutateNeuronValue(neuron.Bias);
@@ -102,7 +102,7 @@ namespace FluffySpoon.Neuro.Evolution
             var cloneB = await b.NeuralNetwork.CloneAsync();
 
             SwapNeuralNetworkNeuronBiases(
-                cloneA, 
+                cloneA,
                 cloneB);
 
             return new Genome<TSimulation>(
@@ -111,7 +111,7 @@ namespace FluffySpoon.Neuro.Evolution
         }
 
         private void SwapNeuralNetworkNeuronBiases(
-            INeuralNetwork cloneA, 
+            INeuralNetwork cloneA,
             INeuralNetwork cloneB)
         {
             var neuronsA = cloneA.GetAllNeurons();
@@ -164,21 +164,31 @@ namespace FluffySpoon.Neuro.Evolution
 
         public void Dispose()
         {
-            if(Simulation is IDisposable disposable)
+            if (Simulation is IDisposable disposable)
                 disposable.Dispose();
         }
 
         public async Task TickAsync()
         {
-            if(Simulation.HasEnded)
+            if (Simulation.HasEnded)
                 return;
 
             var inputs = await Simulation.GetInputsAsync();
             var outputs = await AskAsync(inputs);
 
-            AddBasePair(inputs, outputs);
-
             await Simulation.TickAsync(outputs);
+        }
+
+        public async Task<IGenome<TSimulation>> CloneAsync()
+        {
+            await EnsureTrainedAsync();
+
+            return new Genome<TSimulation>(
+                await NeuralNetwork.CloneAsync(),
+                evolutionSettings)
+            {
+                hasTrained = hasTrained
+            };
         }
     }
 }

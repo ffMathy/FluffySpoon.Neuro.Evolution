@@ -21,5 +21,7 @@ namespace FluffySpoon.Neuro.Evolution
 
         Task<double[]> AskAsync(double[] input);
         Task TickAsync();
+
+        Task<IGenome<TSimulation>> CloneAsync();
     }
 }

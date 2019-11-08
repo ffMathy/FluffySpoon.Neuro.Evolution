@@ -4,7 +4,7 @@ using System.Text;
 
 namespace FluffySpoon.Neuro.Evolution
 {
-    public class EvolutionSettings<TSimulation> : IEvolutionSettings<TSimulation>
+    public class EvolutionSettings<TSimulation> : IEvolutionSettings<TSimulation> where TSimulation : ISimulation
     {
         public Random RandomnessProvider { get; set; } = new Random();
 
@@ -12,9 +12,11 @@ namespace FluffySpoon.Neuro.Evolution
         public int AmountOfGenomesInPopulation { get; set; }
 
         public CreateNewModelDelegate<TSimulation> SimulationFactoryMethod { get; set; }
+        public TickCallbackDelegate<TSimulation> PostTickMethod { get; set; }
 
         public double NeuronMutationProbability { get; set; } = 0.2;
 
         public int[] NeuronCounts { get; set; }
+
     }
 }

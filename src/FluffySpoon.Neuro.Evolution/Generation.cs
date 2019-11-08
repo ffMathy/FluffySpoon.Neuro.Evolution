@@ -9,6 +9,7 @@ namespace FluffySpoon.Neuro.Evolution
     public class Generation<TSimulation> : IGeneration<TSimulation> where TSimulation : ISimulation
     {
         private readonly IEvolutionSettings<TSimulation> evolutionSettings;
+        private readonly IGenomeFactory<TSimulation> genomeFactory;
 
         private HashSet<IGenome<TSimulation>> genomes;
 
@@ -24,6 +25,7 @@ namespace FluffySpoon.Neuro.Evolution
                 genomes.Add(genomeFactory.Create());
 
             this.evolutionSettings = evolutionSettings;
+            this.genomeFactory = genomeFactory;
         }
 
         public void AddGenome(IGenome<TSimulation> genome)
@@ -54,16 +56,27 @@ namespace FluffySpoon.Neuro.Evolution
                 .First();
         }
 
-        public async Task TickAsync()
+        private async Task<bool> TickAsync()
         {
-            foreach(var genome in genomes)
+            var endedCount = 0;
+
+            foreach (var genome in genomes) { 
                 await genome.TickAsync();
+
+                if(genome.Simulation.HasEnded)
+                    endedCount++;
+            }
+
+            evolutionSettings.PostTickMethod?.Invoke(genomes);
+
+            return endedCount == genomes.Count;
         }
 
         public async Task<IGeneration<TSimulation>> EvolveAsync()
         {
-            var clone = Clone();
+            while(!await TickAsync());
 
+            var clone = await CloneAsync();
             clone.RemoveWorstPerformingGenomes();
 
             foreach (var genome in clone.Genomes.AsParallel())
@@ -99,13 +112,15 @@ namespace FluffySpoon.Neuro.Evolution
                 RemoveGenome(genome);
         }
 
-        public IGeneration<TSimulation> Clone()
+        public async Task<IGeneration<TSimulation>> CloneAsync()
         {
+            var genomesClone = await Task.WhenAll(genomes
+                .Select(x => x.CloneAsync()));
             return new Generation<TSimulation>(
                 evolutionSettings,
-                null)
+                genomeFactory)
             {
-                genomes = genomes
+                genomes = new HashSet<IGenome<TSimulation>>(genomesClone)
             };
         }
     }
