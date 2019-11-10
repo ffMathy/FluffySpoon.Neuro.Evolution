@@ -21,11 +21,11 @@ namespace FluffySpoon.Neuro.Evolution
         {
             genomes = new HashSet<IGenome<TSimulation>>();
 
-            for (var i = 0; i < evolutionSettings.AmountOfGenomesInPopulation; i++)
-                genomes.Add(genomeFactory.Create());
-
             this.evolutionSettings = evolutionSettings;
             this.genomeFactory = genomeFactory;
+
+            for (var i = 0; i < evolutionSettings.AmountOfGenomesInPopulation; i++)
+                genomes.Add(genomeFactory.Create());
         }
 
         public void AddGenome(IGenome<TSimulation> genome)
@@ -116,12 +116,14 @@ namespace FluffySpoon.Neuro.Evolution
         {
             var genomesClone = await Task.WhenAll(genomes
                 .Select(x => x.CloneAsync()));
-            return new Generation<TSimulation>(
+            var generation = new Generation<TSimulation>(
                 evolutionSettings,
                 genomeFactory)
             {
                 genomes = new HashSet<IGenome<TSimulation>>(genomesClone)
             };
+
+            return generation;
         }
     }
 }

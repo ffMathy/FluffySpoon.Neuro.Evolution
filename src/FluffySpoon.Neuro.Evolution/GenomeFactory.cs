@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace FluffySpoon.Neuro.Evolution
 {
@@ -19,9 +20,12 @@ namespace FluffySpoon.Neuro.Evolution
 
         public IGenome<TSimulation> Create()
         {
-            return new Genome<TSimulation>(
+            var genome = new Genome<TSimulation>(
                 neuralNetworkFactory.Create(),
                 evolutionSettings);
+            genome.Initialize();
+
+            return genome;
         }
     }
 }

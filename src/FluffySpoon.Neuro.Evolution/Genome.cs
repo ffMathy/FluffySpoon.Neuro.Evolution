@@ -27,9 +27,6 @@ namespace FluffySpoon.Neuro.Evolution
 
             Simulation = evolutionSettings.SimulationFactoryMethod();
             NeuralNetwork = neuralNetwork;
-
-            foreach(var neuron in neuralNetwork.GetAllNeurons())
-                MutateNeuron(neuron);
         }
 
         public void AddBasePair(double[] inputs, double[] expectedOutputs)
@@ -197,6 +194,12 @@ namespace FluffySpoon.Neuro.Evolution
             {
                 hasTrained = hasTrained
             };
+        }
+
+        public void Initialize()
+        {
+            foreach(var neuron in NeuralNetwork.GetAllNeurons())
+                MutateNeuron(neuron);
         }
     }
 }
