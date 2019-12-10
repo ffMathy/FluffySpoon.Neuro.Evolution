@@ -10,11 +10,7 @@ namespace FluffySpoon.Neuro.Evolution
         TSimulation Simulation { get; }
         INeuralNetwork NeuralNetwork { get; }
 
-        void AddBasePair(double[] inputs, double[] outputs);
-        void RemoveBasePair(double[] inputs);
-
         Task<IGenome<TSimulation>> CrossWithAsync(IGenome<TSimulation> other);
-        Task EnsureTrainedAsync();
 
         Task SwapWithAsync(IGenome<TSimulation> other);
         Task MutateAsync(double mutationProbability);

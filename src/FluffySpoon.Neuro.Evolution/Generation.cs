@@ -23,9 +23,6 @@ namespace FluffySpoon.Neuro.Evolution
 
             this.evolutionSettings = evolutionSettings;
             this.genomeFactory = genomeFactory;
-
-            for (var i = 0; i < evolutionSettings.AmountOfGenomesInPopulation; i++)
-                genomes.Add(genomeFactory.Create());
         }
 
         public void AddGenome(IGenome<TSimulation> genome)
@@ -58,6 +55,8 @@ namespace FluffySpoon.Neuro.Evolution
 
         private async Task<bool> TickAsync()
         {
+            await InitializeIfNeededAsync();
+
             var endedCount = 0;
 
             foreach (var genome in genomes) { 
@@ -72,15 +71,21 @@ namespace FluffySpoon.Neuro.Evolution
             return endedCount == genomes.Count;
         }
 
+        private async Task InitializeIfNeededAsync()
+        {
+            if (genomes.Count > 0)
+                return;
+
+            genomes.Add(genomeFactory.Create());
+            await BreedNewGenomesAsync(this);
+        }
+
         public async Task<IGeneration<TSimulation>> EvolveAsync()
         {
             while(!await TickAsync());
 
             var clone = await CloneAsync();
             clone.RemoveWorstPerformingGenomes();
-
-            foreach (var genome in clone.Genomes.AsParallel())
-                await genome.EnsureTrainedAsync();
 
             await BreedNewGenomesAsync(clone);
 

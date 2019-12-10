@@ -9,10 +9,7 @@ namespace FluffySpoon.Neuro.Evolution
 {
     public class Genome<TSimulation> : IGenome<TSimulation> where TSimulation : ISimulation
     {
-        private readonly IDictionary<double[], double[]> basePairs;
         private readonly IEvolutionSettings<TSimulation> evolutionSettings;
-
-        private bool hasTrained;
 
         public INeuralNetwork NeuralNetwork { get; }
         public TSimulation Simulation { get; }
@@ -21,47 +18,19 @@ namespace FluffySpoon.Neuro.Evolution
             INeuralNetwork neuralNetwork,
             IEvolutionSettings<TSimulation> evolutionSettings)
         {
-            this.basePairs = new Dictionary<double[], double[]>();
-
             this.evolutionSettings = evolutionSettings;
 
             Simulation = evolutionSettings.SimulationFactoryMethod();
             NeuralNetwork = neuralNetwork;
         }
 
-        public void AddBasePair(double[] inputs, double[] expectedOutputs)
-        {
-            hasTrained = false;
-            basePairs.Add(inputs, expectedOutputs);
-        }
-
-        public void RemoveBasePair(double[] inputs)
-        {
-            hasTrained = false;
-            basePairs.Remove(inputs);
-        }
-
         public async Task<double[]> AskAsync(double[] input)
         {
-            await EnsureTrainedAsync();
             return NeuralNetwork.Ask(input);
-        }
-
-        public async Task EnsureTrainedAsync()
-        {
-            if (hasTrained)
-                return;
-
-            NeuralNetwork.WipeAllTraining();
-
-            await NeuralNetwork.TrainAsync(basePairs.Keys, basePairs.Values);
-            hasTrained = true;
         }
 
         public async Task MutateAsync(double mutationProbability)
         {
-            await EnsureTrainedAsync();
-
             var random = evolutionSettings.RandomnessProvider;
 
             var neurons = NeuralNetwork.GetAllNeurons();
@@ -99,9 +68,6 @@ namespace FluffySpoon.Neuro.Evolution
             RandomSwap(
                 ref a,
                 ref b);
-
-            await a.EnsureTrainedAsync();
-            await b.EnsureTrainedAsync();
 
             var cloneA = await a.NeuralNetwork.CloneAsync();
             var cloneB = await b.NeuralNetwork.CloneAsync();
@@ -144,9 +110,6 @@ namespace FluffySpoon.Neuro.Evolution
 
         public async Task SwapWithAsync(IGenome<TSimulation> other)
         {
-            await EnsureTrainedAsync();
-            await other.EnsureTrainedAsync();
-
             SwapNeuralNetworkNeuronBiases(
                 NeuralNetwork,
                 other.NeuralNetwork);
@@ -186,14 +149,9 @@ namespace FluffySpoon.Neuro.Evolution
 
         public async Task<IGenome<TSimulation>> CloneAsync()
         {
-            await EnsureTrainedAsync();
-
             return new Genome<TSimulation>(
                 await NeuralNetwork.CloneAsync(),
-                evolutionSettings)
-            {
-                hasTrained = hasTrained
-            };
+                evolutionSettings);
         }
 
         public void Initialize()
