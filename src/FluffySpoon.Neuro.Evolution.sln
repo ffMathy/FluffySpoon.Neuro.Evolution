@@ -5,7 +5,9 @@ VisualStudioVersion = 16.0.29319.158
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FluffySpoon.Neuro.Evolution", "FluffySpoon.Neuro.Evolution\FluffySpoon.Neuro.Evolution.csproj", "{3165ECA9-47E5-47D9-86A7-B16CA9971EEC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluffySpoon.Neuro.Evolution.Sample", "FluffySpoon.Neuro.Evolution.Sample\FluffySpoon.Neuro.Evolution.Sample.csproj", "{1E1F853C-9A50-4F44-A4B1-33309E13550B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FluffySpoon.Neuro.Evolution.Sample", "FluffySpoon.Neuro.Evolution.Sample\FluffySpoon.Neuro.Evolution.Sample.csproj", "{1E1F853C-9A50-4F44-A4B1-33309E13550B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluffySpoon.Neuro.Evolution.Tests", "FluffySpoon.Neuro.Evolution.Tests\FluffySpoon.Neuro.Evolution.Tests.csproj", "{3295A474-FB5B-4C1D-BE6D-4025B299E1F3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{1E1F853C-9A50-4F44-A4B1-33309E13550B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1E1F853C-9A50-4F44-A4B1-33309E13550B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1E1F853C-9A50-4F44-A4B1-33309E13550B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3295A474-FB5B-4C1D-BE6D-4025B299E1F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3295A474-FB5B-4C1D-BE6D-4025B299E1F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3295A474-FB5B-4C1D-BE6D-4025B299E1F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3295A474-FB5B-4C1D-BE6D-4025B299E1F3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

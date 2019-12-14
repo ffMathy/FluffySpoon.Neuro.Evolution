@@ -88,5 +88,10 @@ namespace FluffySpoon.Neuro.Evolution.Sample
             if(accelerationType == AccelerationType.Accelerate)
                 DistanceTravelled++;
         }
+
+        public async Task ResetAsync()
+        {
+            //reset car positions.
+        }
     }
 }

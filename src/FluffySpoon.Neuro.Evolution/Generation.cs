@@ -12,6 +12,7 @@ namespace FluffySpoon.Neuro.Evolution
         private readonly IGenomeFactory<TSimulation> genomeFactory;
 
         private HashSet<IGenome<TSimulation>> genomes;
+        private LinkedList<IGenome<TSimulation>> bestGenomes;
 
         public IReadOnlyCollection<IGenome<TSimulation>> Genomes => genomes;
 
@@ -20,6 +21,7 @@ namespace FluffySpoon.Neuro.Evolution
             IGenomeFactory<TSimulation> genomeFactory)
         {
             genomes = new HashSet<IGenome<TSimulation>>();
+            bestGenomes = new LinkedList<IGenome<TSimulation>>();
 
             this.evolutionSettings = evolutionSettings;
             this.genomeFactory = genomeFactory;
@@ -53,22 +55,49 @@ namespace FluffySpoon.Neuro.Evolution
                 .First();
         }
 
+        /// <returns>True if all simulations have ended.</returns>
         private async Task<bool> TickAsync()
         {
             await InitializeIfNeededAsync();
 
             var endedCount = 0;
 
-            foreach (var genome in genomes) { 
+            bestGenomes.Clear();
+            foreach (var genome in genomes)
+            {
                 await genome.TickAsync();
 
-                if(genome.Simulation.HasEnded)
+                if (genome.Simulation.HasEnded)
                     endedCount++;
+
+                CheckIfGenomeIsAmongBestGenomes(genome);
             }
 
-            evolutionSettings.PostTickMethod?.Invoke(genomes);
+            evolutionSettings.PostTickMethod?.Invoke(new Genomes<TSimulation>(
+                genomes,
+                bestGenomes));
 
             return endedCount == genomes.Count;
+        }
+
+        private void CheckIfGenomeIsAmongBestGenomes(IGenome<TSimulation> genome)
+        {
+            var lowestBestGenomeSoFar = bestGenomes.Last.Value;
+            var currentFitness = genome.Simulation.Fitness;
+            if (lowestBestGenomeSoFar != null && currentFitness >= lowestBestGenomeSoFar.Simulation.Fitness)
+                return;
+
+            var nodeToInsertAt = bestGenomes.Last;
+            while (nodeToInsertAt.Value != null && nodeToInsertAt.Value.Simulation.Fitness < currentFitness)
+                nodeToInsertAt = nodeToInsertAt.Previous;
+
+            bestGenomes.AddBefore(nodeToInsertAt, genome);
+
+            var amountOfGenomesToKeep =
+                evolutionSettings.AmountOfGenomesInPopulation -
+                evolutionSettings.AmountOfWorstGenomesToRemovePerGeneration;
+            if (this.bestGenomes.Count > amountOfGenomesToKeep)
+                bestGenomes.RemoveLast();
         }
 
         private async Task InitializeIfNeededAsync()
@@ -84,12 +113,12 @@ namespace FluffySpoon.Neuro.Evolution
         {
             while(!await TickAsync());
 
-            var clone = await CloneAsync();
-            clone.RemoveWorstPerformingGenomes();
+            var generationClone = await CloneAsync();
+            generationClone.RemoveWorstPerformingGenomes();
 
-            await BreedNewGenomesAsync(clone);
+            await BreedNewGenomesAsync(generationClone);
 
-            return clone;
+            return generationClone;
         }
 
         private async Task BreedNewGenomesAsync(

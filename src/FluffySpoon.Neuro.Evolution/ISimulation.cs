@@ -10,6 +10,7 @@ namespace FluffySpoon.Neuro.Evolution
         double Fitness { get; }
         bool HasEnded { get; }
 
+        Task ResetAsync();
         Task<double[]> GetInputsAsync();
         Task TickAsync(double[] outputs);
     }
