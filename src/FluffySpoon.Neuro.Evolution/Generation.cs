@@ -63,6 +63,7 @@ namespace FluffySpoon.Neuro.Evolution
             var endedCount = 0;
 
             bestGenomes.Clear();
+
             foreach (var genome in genomes)
             {
                 await genome.TickAsync();

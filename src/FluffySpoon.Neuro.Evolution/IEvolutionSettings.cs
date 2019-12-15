@@ -9,8 +9,15 @@ namespace FluffySpoon.Neuro.Evolution
 
     public struct Genomes<TSimulation> where TSimulation : ISimulation
     {
-        ICollection<IGenome<TSimulation>> All { get; }
-        ICollection<IGenome<TSimulation>> Best { get; }
+        public ICollection<IGenome<TSimulation>> All
+        {
+            get;
+        }
+
+        public ICollection<IGenome<TSimulation>> Best
+        {
+            get;
+        }
 
         public Genomes(
             ICollection<IGenome<TSimulation>> all,
@@ -23,12 +30,27 @@ namespace FluffySpoon.Neuro.Evolution
 
     public interface IEvolutionSettings<TSimulation> : INeuralNetworkSettings where TSimulation : ISimulation
     {
-        Random RandomnessProvider { get; }
+        Random RandomnessProvider
+        {
+            get;
+        }
 
-        int AmountOfWorstGenomesToRemovePerGeneration { get; }
-        int AmountOfGenomesInPopulation { get; }
+        int AmountOfWorstGenomesToRemovePerGeneration
+        {
+            get;
+        }
+        int AmountOfGenomesInPopulation
+        {
+            get;
+        }
 
-        CreateNewModelDelegate<TSimulation> SimulationFactoryMethod { get; }
-        TickCallbackDelegate<TSimulation> PostTickMethod { get; }
+        CreateNewModelDelegate<TSimulation> SimulationFactoryMethod
+        {
+            get;
+        }
+        TickCallbackDelegate<TSimulation> PostTickMethod
+        {
+            get;
+        }
     }
 }
