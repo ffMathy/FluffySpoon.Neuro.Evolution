@@ -83,21 +83,28 @@ namespace FluffySpoon.Neuro.Evolution
 
         private void CheckIfGenomeIsAmongBestGenomes(IGenome<TSimulation> genome)
         {
-            var lowestBestGenomeSoFar = bestGenomes.Last.Value;
+            var lowestBestGenomeSoFar = bestGenomes.Last?.Value;
             var currentFitness = genome.Simulation.Fitness;
             if (lowestBestGenomeSoFar != null && currentFitness >= lowestBestGenomeSoFar.Simulation.Fitness)
                 return;
 
             var nodeToInsertAt = bestGenomes.Last;
-            while (nodeToInsertAt.Value != null && nodeToInsertAt.Value.Simulation.Fitness < currentFitness)
+            while (nodeToInsertAt?.Value != null && nodeToInsertAt.Value.Simulation.Fitness < currentFitness)
                 nodeToInsertAt = nodeToInsertAt.Previous;
 
-            bestGenomes.AddBefore(nodeToInsertAt, genome);
+            if (nodeToInsertAt == null)
+            {
+                bestGenomes.AddFirst(genome);
+            }
+            else
+            {
+                bestGenomes.AddBefore(nodeToInsertAt, genome);
+            }
 
             var amountOfGenomesToKeep =
                 evolutionSettings.AmountOfGenomesInPopulation -
                 evolutionSettings.AmountOfWorstGenomesToRemovePerGeneration;
-            if (this.bestGenomes.Count > amountOfGenomesToKeep)
+            if (bestGenomes.Count > amountOfGenomesToKeep)
                 bestGenomes.RemoveLast();
         }
 
