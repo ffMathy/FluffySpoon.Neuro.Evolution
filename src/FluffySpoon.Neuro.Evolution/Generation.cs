@@ -113,8 +113,8 @@ namespace FluffySpoon.Neuro.Evolution
             if (genomes.Count > 0)
                 return;
 
-            genomes.Add(genomeFactory.Create());
-            await BreedNewGenomesAsync(this);
+            while (genomes.Count < evolutionSettings.AmountOfGenomesInPopulation)
+                genomes.Add(genomeFactory.Create());
         }
 
         public async Task<IGeneration<TSimulation>> EvolveAsync()

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,19 +10,24 @@ namespace FluffySpoon.Neuro.Evolution.Tests
     [TestClass]
     public class GenerationTest
     {
-        private int hashOffset;
-
         [TestMethod]
         public async Task Evolve_HighwayTest()
         {
-            var genomes = new List<IGenome<ISimulation>>();
-            for (var i = 0; i < 100; i++)
-                genomes.Add(GenerateFakeGenome());
+            var genome1 = GenerateFakeGenome();
+            var genome2 = GenerateFakeGenome();
+            var genome3 = GenerateFakeGenome();
+            var genome4 = GenerateFakeGenome();
+            var genome5 = GenerateFakeGenome();
 
             var fakeGenomeFactory = Substitute.For<IGenomeFactory<ISimulation>>();
             fakeGenomeFactory
                 .Create()
-                .Returns(genomes[0], genomes.Skip(1).ToArray());
+                .Returns(
+                    genome1,
+                    genome2,
+                    genome3,
+                    genome4,
+                    genome5);
 
             var generation = new Generation<ISimulation>(
                 new EvolutionSettings<ISimulation>() {
@@ -38,15 +44,29 @@ namespace FluffySpoon.Neuro.Evolution.Tests
             var fakeGenome = Substitute.For<IGenome<ISimulation>>();
 
             fakeGenome
-                .GetHashCode()
-                .Returns(c => ++hashOffset);
-
-            fakeGenome
                 .Simulation
-                .HasEnded
-                .Returns(true);
+                .Returns(new AlreadyEndedSimulation());
 
             return fakeGenome;
+        }
+    }
+
+    public class AlreadyEndedSimulation : ISimulation
+    {
+        public double Fitness { get; }
+        public bool HasEnded { get; } = true;
+
+        public async Task ResetAsync()
+        {
+        }
+
+        public async Task<double[]> GetInputsAsync()
+        {
+            return Array.Empty<double>();
+        }
+
+        public async Task TickAsync(double[] outputs)
+        {
         }
     }
 }
