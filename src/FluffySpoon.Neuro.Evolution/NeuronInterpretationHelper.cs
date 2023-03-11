@@ -1,45 +1,43 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
-namespace FluffySpoon.Neuro.Evolution
+namespace FluffySpoon.Neuro.Evolution;
+
+public static class NeuronInterpretationHelper
 {
-    public static class NeuronInterpretationHelper
+    public static TEnum InterpretAsEnum<TEnum>(double neuronInput) where TEnum : Enum
     {
-        public static TEnum InterpretAsEnum<TEnum>(double neuronInput) where TEnum : Enum
+        var allEnums = GetEnumValues<TEnum>();
+        var threshold = 1d / allEnums.Count;
+
+        for (var i = threshold; i < 1; i += threshold)
         {
-            var allEnums = GetEnumValues<TEnum>();
-            var threshold = 1d / allEnums.Count;
-
-            for (var i = threshold; i < 1; i += threshold)
-            {
-                if (neuronInput < i)
-                    return allEnums[(int)(i * allEnums.Count + threshold / 2d)];
-            }
-
-            return allEnums[allEnums.Count - 1];
+            if (neuronInput < i)
+                return allEnums[(int)(i * allEnums.Count + threshold / 2d)];
         }
 
-        public static bool InterpretAsBoolean(double neuronInput)
-        {
-            return neuronInput > 0.5;
-        }
+        return allEnums[allEnums.Count - 1];
+    }
 
-        public static double ConvertEnumToNeuronInput<TEnum>(TEnum enumValue) where TEnum : Enum
-        {
-            var allEnums = GetEnumValues<TEnum>();
-            var threshold = 1d / allEnums.Count;
+    public static bool InterpretAsBoolean(double neuronInput)
+    {
+        return neuronInput > 0.5;
+    }
 
-            return (allEnums.IndexOf(enumValue) * threshold) + (threshold / 2);
-        }
+    public static double ConvertEnumToNeuronInput<TEnum>(TEnum enumValue) where TEnum : Enum
+    {
+        var allEnums = GetEnumValues<TEnum>();
+        var threshold = 1d / allEnums.Count;
 
-        private static IList<TEnum> GetEnumValues<TEnum>() where TEnum : Enum
-        {
-            return typeof(TEnum)
-                .GetEnumValues()
-                .Cast<TEnum>()
-                .ToList();
-        }
+        return (allEnums.IndexOf(enumValue) * threshold) + (threshold / 2);
+    }
+
+    private static IList<TEnum> GetEnumValues<TEnum>() where TEnum : Enum
+    {
+        return typeof(TEnum)
+            .GetEnumValues()
+            .Cast<TEnum>()
+            .ToList();
     }
 }

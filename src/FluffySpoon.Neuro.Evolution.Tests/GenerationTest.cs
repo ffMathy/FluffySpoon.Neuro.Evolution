@@ -1,72 +1,68 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
+using FluffySpoon.Neuro.Evolution.Domain;
+using FluffySpoon.Neuro.Evolution.Domain.Genomics;
+using FluffySpoon.Neuro.Evolution.Infrastructure.Settings;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 
-namespace FluffySpoon.Neuro.Evolution.Tests
+namespace FluffySpoon.Neuro.Evolution.Tests;
+
+[TestClass]
+public class GenerationTest
 {
-    [TestClass]
-    public class GenerationTest
+    [TestMethod]
+    public async Task Evolve_HighwayTest()
     {
-        [TestMethod]
-        public async Task Evolve_HighwayTest()
-        {
-            var genome1 = GenerateFakeGenome();
-            var genome2 = GenerateFakeGenome();
-            var genome3 = GenerateFakeGenome();
-            var genome4 = GenerateFakeGenome();
-            var genome5 = GenerateFakeGenome();
+        var genome1 = GenerateFakeGenome();
+        var genome2 = GenerateFakeGenome();
+        var genome3 = GenerateFakeGenome();
+        var genome4 = GenerateFakeGenome();
+        var genome5 = GenerateFakeGenome();
 
-            var fakeGenomeFactory = Substitute.For<IGenomeFactory<ISimulation>>();
-            fakeGenomeFactory
-                .Create()
-                .Returns(
-                    genome1,
-                    genome2,
-                    genome3,
-                    genome4,
-                    genome5);
+        var fakeGenomeFactory = Substitute.For<IGenomeFactory<ISimulation>>();
+        fakeGenomeFactory
+            .Create()
+            .Returns(
+                genome1,
+                genome2,
+                genome3,
+                genome4,
+                genome5);
 
-            var generation = new Generation<ISimulation>(
-                new EvolutionSettings<ISimulation>() {
-                    AmountOfGenomesInPopulation = 5,
-                    AmountOfWorstGenomesToRemovePerGeneration = 2
-                },
-                fakeGenomeFactory);
+        var generation = new Generation<ISimulation>(
+            new EvolutionSettings<ISimulation>() {
+                AmountOfGenomesInPopulation = 5,
+                AmountOfWorstGenomesToRemovePerGeneration = 2
+            },
+            fakeGenomeFactory);
 
-            await generation.EvolveAsync();
-        }
-
-        private IGenome<ISimulation> GenerateFakeGenome()
-        {
-            var fakeGenome = Substitute.For<IGenome<ISimulation>>();
-
-            fakeGenome
-                .Simulation
-                .Returns(new AlreadyEndedSimulation());
-
-            return fakeGenome;
-        }
+        generation.Evolve();
     }
 
-    public class AlreadyEndedSimulation : ISimulation
+    private IGenome<ISimulation> GenerateFakeGenome()
     {
-        public double Fitness { get; }
-        public bool HasEnded { get; } = true;
+        var fakeGenome = Substitute.For<IGenome<ISimulation>>();
 
-        public async Task ResetAsync()
-        {
-        }
+        fakeGenome
+            .Simulation
+            .Returns(new AlreadyEndedSimulation());
 
-        public async Task<double[]> GetInputsAsync()
-        {
-            return Array.Empty<double>();
-        }
+        return fakeGenome;
+    }
+}
 
-        public async Task TickAsync(double[] outputs)
-        {
-        }
+public class AlreadyEndedSimulation : ISimulation
+{
+    public double Fitness { get; }
+    public bool HasEnded { get; } = true;
+    
+    public float[] GetInputs()
+    {
+        return Array.Empty<float>();
+    }
+
+    public void Tick(float[] outputs)
+    {
     }
 }
