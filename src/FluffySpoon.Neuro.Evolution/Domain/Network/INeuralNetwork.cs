@@ -6,5 +6,5 @@ public interface INeuralNetwork
 
     float[] Ask(float[] input);
 
-    INeuron[] Neurons { get; }
+    Neuron[] Neurons { get; }
 }
