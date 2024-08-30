@@ -26,7 +26,7 @@ public class NeuralNetwork : INeuralNetwork
 {
     private readonly INeuralNetworkSettings _settings;
 
-    private readonly Layer[] _layers;
+    private Layer[] _layers;
 
     public Neuron[] Neurons => _layers
         .SelectMany(x => x.Neurons)
@@ -46,7 +46,7 @@ public class NeuralNetwork : INeuralNetwork
                 var neuron = new Neuron
                 {
                     Bias = _settings.RandomnessProvider.NextFloat(-0.5f, 0.5f),
-                    Layer = layer
+                    Layer = layer,
                 };
 
                 layer.Neurons.Add(neuron);
@@ -59,6 +59,9 @@ public class NeuralNetwork : INeuralNetwork
         {
             var currentLayer = layers[layerIndex];
             var previousLayer = layers[layerIndex - 1];
+
+            currentLayer.Previous = previousLayer;
+            previousLayer.Next = currentLayer;
             
             foreach (var previousLayerNeuron in previousLayer.Neurons)
             {
@@ -68,7 +71,7 @@ public class NeuralNetwork : INeuralNetwork
                     {
                         Source = previousLayerNeuron,
                         Destination = currentLayerNeuron,
-                        Weight = _settings.RandomnessProvider.NextFloat(-0.5f, 0.5f)
+                        Weight = _settings.RandomnessProvider.NextFloat(-0.5f, 0.5f),
                     };
                     previousLayerNeuron.DendritesTowardsNextLayer.Add(dendrite);
                 }
@@ -76,8 +79,6 @@ public class NeuralNetwork : INeuralNetwork
         }
         
         _layers = layers.ToArray();
-        
-        throw new NotImplementedException("TODO: Implement this method.")
     }
 
     public float[] Ask(float[] inputs)
@@ -147,13 +148,16 @@ public class NeuralNetwork : INeuralNetwork
             {
                 foreach (var currentLayerNeuron in currentLayer.Neurons)
                 {
-                    var clonedDendrite = new Dendrite()
+                    foreach (var dendriteToNextLayer in previousLayerNeuron.DendritesTowardsNextLayer)
                     {
-                        Source = previousLayerNeuron,
-                        Destination = currentLayerNeuron,
-                        Weight = 
-                    };
-                    previousLayerNeuron.DendritesTowardsNextLayer.Add(clonedDendrite);
+                        var clonedDendrite = new Dendrite()
+                        {
+                            Source = previousLayerNeuron,
+                            Destination = currentLayerNeuron,
+                            Weight = dendriteToNextLayer.Weight
+                        };
+                        previousLayerNeuron.DendritesTowardsNextLayer.Add(clonedDendrite);
+                    }
                 }
             }
         }
