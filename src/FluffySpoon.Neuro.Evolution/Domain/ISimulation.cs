@@ -1,6 +1,8 @@
-﻿namespace FluffySpoon.Neuro.Evolution.Domain;
+﻿using System;
 
-public interface ISimulation
+namespace FluffySpoon.Neuro.Evolution.Domain;
+
+public interface ISimulation: IDisposable, IAsyncDisposable
 {
     double Fitness { get; }
     bool HasEnded { get; }

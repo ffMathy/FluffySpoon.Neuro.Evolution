@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading.Tasks;
 using FluffySpoon.Neuro.Evolution.Domain.Network;
 using FluffySpoon.Neuro.Evolution.Infrastructure.Extensions;
 using FluffySpoon.Neuro.Evolution.Infrastructure.Settings;
@@ -31,13 +32,14 @@ public class Genome<TSimulation> : IGenome<TSimulation> where TSimulation : ISim
         }
     }
 
-    private void MutateNeuron(INeuron neuron)
+    private void MutateNeuron(Neuron neuron)
     {
         neuron.Bias = MutateNeuronValue(neuron.Bias);
 
-        neuron.Weights = neuron.Weights
-            .Select(MutateNeuronValue)
-            .ToArray();
+        foreach (var dendrite in neuron.DendritesTowardsNextLayer)
+        {
+            dendrite.Weight = MutateNeuronValue(dendrite.Weight);
+        }
     }
 
     private float MutateNeuronValue(float value)
@@ -48,12 +50,6 @@ public class Genome<TSimulation> : IGenome<TSimulation> where TSimulation : ISim
                 _evolutionSettings.MutationStrength)
             : value;
         return value;
-    }
-
-    public void Dispose()
-    {
-        if (Simulation is IDisposable disposable)
-            disposable.Dispose();
     }
 
     public void Tick()
@@ -71,5 +67,17 @@ public class Genome<TSimulation> : IGenome<TSimulation> where TSimulation : ISim
         return new Genome<TSimulation>(
             NeuralNetwork.Clone(),
             _evolutionSettings);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Simulation is IAsyncDisposable asyncDisposable)
+            await asyncDisposable.DisposeAsync();
+    }
+
+    public void Dispose()
+    {
+        if (Simulation is IDisposable disposable)
+            disposable.Dispose();
     }
 }

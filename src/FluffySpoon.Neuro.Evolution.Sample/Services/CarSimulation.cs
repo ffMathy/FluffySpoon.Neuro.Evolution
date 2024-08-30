@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using FluffySpoon.Neuro.Evolution.Domain;
 using FluffySpoon.Neuro.Evolution.Sample.Helpers;
 using FluffySpoon.Neuro.Evolution.Sample.Models;
@@ -278,6 +279,14 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
             {
                 _laps--;
             }
+        }
+
+        public void Dispose()
+        {
+        }
+
+        public async ValueTask DisposeAsync()
+        {
         }
     }
 }

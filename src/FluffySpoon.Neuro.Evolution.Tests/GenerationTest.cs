@@ -65,4 +65,13 @@ public class AlreadyEndedSimulation : ISimulation
     public void Tick(float[] outputs)
     {
     }
+
+    public void Dispose()
+    {
+        
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+    }
 }
