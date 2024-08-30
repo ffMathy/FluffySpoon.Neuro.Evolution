@@ -15,7 +15,7 @@ public class NeuralNetworkFactory : INeuralNetworkFactory
     {
         _settings = settings;
     }
-    
+
     public INeuralNetwork Create()
     {
         return new NeuralNetwork(_settings);
@@ -36,24 +36,24 @@ public class NeuralNetwork : INeuralNetwork
         INeuralNetworkSettings settings)
     {
         _settings = settings;
-        
+
         var layers = new List<Layer>();
         foreach (var layerNeuronCount in settings.NeuronCounts)
         {
             var layer = new Layer();
-            for(var neuronIndex = 0; neuronIndex < layerNeuronCount; neuronIndex++)
+            for (var neuronIndex = 0; neuronIndex < layerNeuronCount; neuronIndex++)
             {
                 var neuron = new Neuron(layer)
                 {
-                    Bias = _settings.RandomnessProvider.NextFloat(-0.5f, 0.5f),
+                    Bias = _settings.RandomnessProvider.NextFloat(-0.01f, 0.01f),
                 };
 
                 layer.Neurons.Add(neuron);
             }
-            
+
             layers.Add(layer);
         }
-        
+
         for (var layerIndex = 1; layerIndex < settings.NeuronCounts.Length; layerIndex++)
         {
             var currentLayer = layers[layerIndex];
@@ -61,7 +61,7 @@ public class NeuralNetwork : INeuralNetwork
 
             currentLayer.Previous = previousLayer;
             previousLayer.Next = currentLayer;
-            
+
             foreach (var previousLayerNeuron in previousLayer.Neurons)
             {
                 foreach (var currentLayerNeuron in currentLayer.Neurons)
@@ -74,46 +74,55 @@ public class NeuralNetwork : INeuralNetwork
                 }
             }
         }
-        
+
         _layers = layers.ToArray();
     }
 
     public float[] Ask(float[] inputs)
     {
         var clonedLayers = CloneLayers();
-        
-        var firstLayer = clonedLayers.First();
-        for (var index = 0; index < firstLayer.Neurons.Count; index++)
+
+        var layerComputationStates = clonedLayers
+            .Select(layer => layer.Neurons
+                .Select(neuron => new NeuronComputation(neuron))
+                .ToArray())
+            .ToArray();
+
+        // Set activations of the first layer based on inputs
+        var firstLayerComputationStates = layerComputationStates.First();
+        if (inputs.Length != firstLayerComputationStates.Length)
+            throw new ArgumentException("Input size does not match the number of neurons in the input layer.");
+
+        for (var index = 0; index < firstLayerComputationStates.Length; index++)
         {
-            var neuron = firstLayer.Neurons[index];
-            neuron.Bias = inputs[index];
+            firstLayerComputationStates[index].Activation = inputs[index];
         }
 
-        for (var currentLayerIndex = 1; currentLayerIndex < clonedLayers.Length; currentLayerIndex++)
+        for (var currentLayerIndex = 1; currentLayerIndex < layerComputationStates.Length; currentLayerIndex++)
         {
-            var currentLayerClone = clonedLayers[currentLayerIndex];
-            
-            var previousLayerIndex = currentLayerIndex - 1;
-            var previousLayerClone = clonedLayers[previousLayerIndex];
+            var currentLayerComputationStates = layerComputationStates[currentLayerIndex];
+            var previousLayerComputationStates = layerComputationStates[currentLayerIndex - 1];
 
-            for (var currentLayerNeuronIndex = 0; currentLayerNeuronIndex < currentLayerClone.Neurons.Count; currentLayerNeuronIndex++)
+            for (var currentLayerNeuronIndex = 0;
+                 currentLayerNeuronIndex < currentLayerComputationStates.Length;
+                 currentLayerNeuronIndex++)
             {
-                var sum = previousLayerClone.Neurons
-                    .Select((previousLayerNeuron, previousLayerNeuronIndex) =>
+                var sum = previousLayerComputationStates
+                    .Select((previousNeuronComputation, previousNeuronIndex) =>
                     {
-                        var dendriteWeightFromPreviousLayer = previousLayerClone.Neurons[previousLayerNeuronIndex]
-                            .DendritesTowardsNextLayer[currentLayerNeuronIndex]
+                        var weight = previousNeuronComputation.Neuron.DendritesTowardsNextLayer[currentLayerNeuronIndex]
                             .Weight;
-                        return dendriteWeightFromPreviousLayer * previousLayerNeuron.Bias;
+                        return weight * previousNeuronComputation.Activation;
                     })
                     .Sum();
 
-                currentLayerClone.Neurons[currentLayerNeuronIndex].Bias = Activate(sum + currentLayerClone.Neurons[currentLayerNeuronIndex].Bias);
+                var bias = currentLayerComputationStates[currentLayerNeuronIndex].Neuron.Bias;
+                currentLayerComputationStates[currentLayerNeuronIndex].Activation = Activate(sum + bias);
             }
         }
 
-        return clonedLayers[^1].Neurons
-            .Select(x => x.Bias)
+        return layerComputationStates[^1]
+            .Select(state => state.Activation)
             .ToArray();
     }
 
@@ -133,7 +142,7 @@ public class NeuralNetwork : INeuralNetwork
 
             clonedLayers.Add(clonedLayer);
         }
-        
+
         for (var layerIndex = 1; layerIndex < clonedLayers.Count; layerIndex++)
         {
             var currentLayer = clonedLayers[layerIndex];
@@ -141,7 +150,7 @@ public class NeuralNetwork : INeuralNetwork
 
             currentLayer.Previous = previousLayer;
             previousLayer.Next = currentLayer;
-            
+
             foreach (var previousLayerNeuron in previousLayer.Neurons)
             {
                 foreach (var currentLayerNeuron in currentLayer.Neurons)
