@@ -3,19 +3,19 @@ using System.Linq;
 
 namespace FluffySpoon.Neuro.Evolution.Domain.Network;
 
-public class Neuron
+public class Neuron(Layer layer)
 {
     public float Bias { get; set; }
-    
-    public Layer Layer { get; set; }
 
-    public List<Dendrite> DendritesTowardsNextLayer { get; } = new List<Dendrite>();
+    public Layer Layer { get; } = layer;
+
+    public List<Dendrite> DendritesTowardsNextLayer { get; } = new();
 }
 
-public class Dendrite
+public class Dendrite(Neuron source, Neuron destination)
 {
     public float Weight { get; set; }
-    
-    public Neuron Source { get; set; }
-    public Neuron Destination { get; set; }
+
+    public Neuron Source { get; } = source;
+    public Neuron Destination { get;  } = destination;
 }

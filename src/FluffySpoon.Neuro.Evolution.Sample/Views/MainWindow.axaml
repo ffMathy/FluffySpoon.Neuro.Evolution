@@ -6,27 +6,14 @@
         x:Class="FluffySpoon.Neuro.Evolution.Sample.Views.MainWindow"
         Icon="/Assets/avalonia-logo.ico"
         Title="FluffySpoon.Neuro.Evolution.Sample">
-    <Grid Background="Gray">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition />
-            <ColumnDefinition />
-            <ColumnDefinition />
-        </Grid.ColumnDefinitions>
-        <Button Name="GenerateNewMapButton" Click="GenerateNewMapButton_Click" Padding="24">Generate new map</Button>
-        <Grid Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition />
-                <RowDefinition />
-            </Grid.RowDefinitions>
-            <CheckBox Name="KeepRunningCheckbox" HorizontalAlignment="Center" Margin="12" Checked="KeepRunningCheckbox_Checked" Unchecked="KeepRunningCheckbox_Unchecked">Keep running</CheckBox>
-            <Button Grid.Row="1" Name="TrainGenerationButton" Click="TrainGenerationButton_Click" Padding="24">Train single generation</Button>
+    <Grid Background="Gray" ColumnDefinitions="*,*,*" RowDefinitions="Auto,*">
+        <Grid Grid.Row="0" Grid.Column="2" RowDefinitions="*,*,*,*">
+            <CheckBox Grid.Column="0" Grid.Row="0" Name="KeepRunningCheckbox" HorizontalAlignment="Center" Margin="12" Checked="KeepRunningCheckbox_Checked" Unchecked="KeepRunningCheckbox_Unchecked">Keep running</CheckBox>
+            <Button Grid.Row="3" Grid.Column="0" Name="GenerateNewMapButton" Click="GenerateNewMapButton_Click" Padding="24">Generate new map</Button>
+            <Button Grid.Column="0" Grid.Row="1" Name="TrainGenerationButton" Click="TrainGenerationButton_Click" Padding="24">Train single generation</Button>
+            <Button Grid.Column="0" Grid.Row="2" Name="TrainMultipleGenerationsButton" Click="TrainMultipleGenerationsButton_Click" Padding="24">Train multiple generations</Button>
         </Grid>
-        <Button Grid.Column="2" Name="TrainMultipleGenerationsButton" Click="TrainMultipleGenerationsButton_Click" Padding="24">Train multiple generations</Button>
-        <Canvas Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="1" Name="MapCanvas">
+        <Canvas Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="1" Name="MapCanvas">
             <Canvas.RenderTransform>
                 <ScaleTransform ScaleX="1" ScaleY="1" />
             </Canvas.RenderTransform>

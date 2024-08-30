@@ -43,10 +43,9 @@ public class NeuralNetwork : INeuralNetwork
             var layer = new Layer();
             for(var neuronIndex = 0; neuronIndex < layerNeuronCount; neuronIndex++)
             {
-                var neuron = new Neuron
+                var neuron = new Neuron(layer)
                 {
                     Bias = _settings.RandomnessProvider.NextFloat(-0.5f, 0.5f),
-                    Layer = layer,
                 };
 
                 layer.Neurons.Add(neuron);
@@ -67,10 +66,8 @@ public class NeuralNetwork : INeuralNetwork
             {
                 foreach (var currentLayerNeuron in currentLayer.Neurons)
                 {
-                    var dendrite = new Dendrite()
+                    var dendrite = new Dendrite(previousLayerNeuron, currentLayerNeuron)
                     {
-                        Source = previousLayerNeuron,
-                        Destination = currentLayerNeuron,
                         Weight = _settings.RandomnessProvider.NextFloat(-0.5f, 0.5f),
                     };
                     previousLayerNeuron.DendritesTowardsNextLayer.Add(dendrite);
@@ -94,22 +91,24 @@ public class NeuralNetwork : INeuralNetwork
 
         for (var currentLayerIndex = 1; currentLayerIndex < clonedLayers.Length; currentLayerIndex++)
         {
-            var previousLayerIndex = currentLayerIndex - 1;
+            var currentLayerClone = clonedLayers[currentLayerIndex];
             
-            for (var currentLayerNeuronIndex = 0; currentLayerNeuronIndex < clonedLayers[currentLayerIndex].Neurons.Count; currentLayerNeuronIndex++)
+            var previousLayerIndex = currentLayerIndex - 1;
+            var previousLayerClone = clonedLayers[previousLayerIndex];
+
+            for (var currentLayerNeuronIndex = 0; currentLayerNeuronIndex < currentLayerClone.Neurons.Count; currentLayerNeuronIndex++)
             {
-                var value = clonedLayers[previousLayerIndex].Neurons
+                var sum = previousLayerClone.Neurons
                     .Select((previousLayerNeuron, previousLayerNeuronIndex) =>
                     {
-                        var dendriteWeightFromPreviousLayer = clonedLayers[previousLayerIndex]
-                            .Neurons[currentLayerNeuronIndex]
-                            .DendritesTowardsNextLayer[previousLayerNeuronIndex]
+                        var dendriteWeightFromPreviousLayer = previousLayerClone.Neurons[previousLayerNeuronIndex]
+                            .DendritesTowardsNextLayer[currentLayerNeuronIndex]
                             .Weight;
                         return dendriteWeightFromPreviousLayer * previousLayerNeuron.Bias;
                     })
                     .Sum();
 
-                clonedLayers[currentLayerIndex].Neurons[currentLayerNeuronIndex].Bias = Activate(value + clonedLayers[currentLayerIndex].Neurons[currentLayerNeuronIndex].Bias);
+                currentLayerClone.Neurons[currentLayerNeuronIndex].Bias = Activate(sum + currentLayerClone.Neurons[currentLayerNeuronIndex].Bias);
             }
         }
 
@@ -126,9 +125,8 @@ public class NeuralNetwork : INeuralNetwork
             var clonedLayer = new Layer();
             foreach (var neuron in layer.Neurons)
             {
-                clonedLayer.Neurons.Add(new Neuron()
+                clonedLayer.Neurons.Add(new Neuron(layer)
                 {
-                    Layer = layer,
                     Bias = neuron.Bias
                 });
             }
@@ -150,10 +148,8 @@ public class NeuralNetwork : INeuralNetwork
                 {
                     foreach (var dendriteToNextLayer in previousLayerNeuron.DendritesTowardsNextLayer)
                     {
-                        var clonedDendrite = new Dendrite()
+                        var clonedDendrite = new Dendrite(previousLayerNeuron, currentLayerNeuron)
                         {
-                            Source = previousLayerNeuron,
-                            Destination = currentLayerNeuron,
                             Weight = dendriteToNextLayer.Weight
                         };
                         previousLayerNeuron.DendritesTowardsNextLayer.Add(clonedDendrite);

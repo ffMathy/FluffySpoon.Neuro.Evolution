@@ -24,7 +24,7 @@ public partial class MainWindow : Window
     private bool _keepRunning;
     private bool _render;
 
-    private Map _map;
+    private Map? _map;
     private IGeneration<CarSimulation> _currentGeneration;
 
     public MainWindow()
@@ -47,7 +47,7 @@ public partial class MainWindow : Window
                 MutationProbability = 0.05f,
                 MutationStrength = 0.5f,
                 RandomnessProvider = _random,
-                SimulationFactoryMethod = () => new CarSimulation(_map),
+                SimulationFactoryMethod = () => new CarSimulation(_map ?? throw new Exception("No map has been generated yet.")),
                 PostTickMethod = RenderGenomes
             });
 
@@ -75,7 +75,12 @@ public partial class MainWindow : Window
         ClearCanvas();
     }
 
-    private async void TrainGenerationButton_Click(object sender, RoutedEventArgs e)
+    private void TrainGenerationButton_Click(object sender, RoutedEventArgs e)
+    {
+        RunGeneration();
+    }
+
+    private async void RunGeneration()
     {
         _render = true;
 
@@ -104,6 +109,11 @@ public partial class MainWindow : Window
 
     private void RenderMap()
     {
+        if (_map == null)
+        {
+            throw new InvalidOperationException("No map has been generated yet.");
+        }
+        
         foreach (var node in _map.Nodes)
         {
             RenderMapNode(node);
