@@ -107,6 +107,13 @@ public class NeuralNetwork : INeuralNetwork
                  currentLayerNeuronIndex < currentLayerComputationStates.Length;
                  currentLayerNeuronIndex++)
             {
+                if (previousLayerComputationStates.Any(p =>
+                        p.Neuron.DendritesTowardsNextLayer.Count <= currentLayerNeuronIndex))
+                {
+                    throw new IndexOutOfRangeException(
+                        $"Mismatch in dendrite counts. Expected dendrites towards next layer to have at least {currentLayerNeuronIndex + 1} elements.");
+                }
+
                 var sum = previousLayerComputationStates
                     .Select((previousNeuronComputation, previousNeuronIndex) =>
                     {
@@ -136,7 +143,7 @@ public class NeuralNetwork : INeuralNetwork
             {
                 clonedLayer.Neurons.Add(new Neuron(layer)
                 {
-                    Bias = neuron.Bias
+                    Bias = neuron.Bias,
                 });
             }
 
@@ -145,23 +152,31 @@ public class NeuralNetwork : INeuralNetwork
 
         for (var layerIndex = 1; layerIndex < clonedLayers.Count; layerIndex++)
         {
-            var currentLayer = clonedLayers[layerIndex];
-            var previousLayer = clonedLayers[layerIndex - 1];
+            var currentLayer = _layers[layerIndex];
+            var previousLayer = _layers[layerIndex - 1];
+            
+            var currentLayerClone = clonedLayers[layerIndex];
+            var previousLayerClone = clonedLayers[layerIndex - 1];
 
-            currentLayer.Previous = previousLayer;
-            previousLayer.Next = currentLayer;
+            currentLayerClone.Previous = previousLayerClone;
+            previousLayerClone.Next = currentLayerClone;
 
-            foreach (var previousLayerNeuron in previousLayer.Neurons)
+            for (var previousLayerNeuronIndex = 0; previousLayerNeuronIndex < previousLayer.Neurons.Count; previousLayerNeuronIndex++)
             {
-                foreach (var currentLayerNeuron in currentLayer.Neurons)
+                var previousLayerNeuron = previousLayer.Neurons[previousLayerNeuronIndex];
+                var previousLayerNeuronClone = previousLayerClone.Neurons[previousLayerNeuronIndex];
+                
+                for (var currentLayerNeuronIndex = 0; currentLayerNeuronIndex < currentLayer.Neurons.Count; currentLayerNeuronIndex++)
                 {
+                    var currentLayerNeuronClone = currentLayerClone.Neurons[currentLayerNeuronIndex];
+                    
                     foreach (var dendriteToNextLayer in previousLayerNeuron.DendritesTowardsNextLayer)
                     {
-                        var clonedDendrite = new Dendrite(previousLayerNeuron, currentLayerNeuron)
+                        var clonedDendrite = new Dendrite(previousLayerNeuronClone, currentLayerNeuronClone)
                         {
                             Weight = dendriteToNextLayer.Weight
                         };
-                        previousLayerNeuron.DendritesTowardsNextLayer.Add(clonedDendrite);
+                        previousLayerNeuronClone.DendritesTowardsNextLayer.Add(clonedDendrite);
                     }
                 }
             }

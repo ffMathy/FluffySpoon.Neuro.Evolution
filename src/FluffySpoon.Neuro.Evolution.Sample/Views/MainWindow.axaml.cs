@@ -41,8 +41,8 @@ public partial class MainWindow : Window
         serviceCollection.AddFluffySpoonNeuroEvolution(
             new EvolutionSettings<CarSimulation>()
             {
-                AmountOfGenomesInPopulation = 100,
-                AmountOfWorstGenomesToRemovePerGeneration = 50,
+                AmountOfGenomesInPopulation = 3,
+                AmountOfWorstGenomesToRemovePerGeneration = 1,
                 NeuronCounts = new[] { 7, 5, 2 },
                 MutationProbability = 0.05f,
                 MutationStrength = 0.5f,
