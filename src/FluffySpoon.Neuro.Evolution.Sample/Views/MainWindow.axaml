@@ -21,6 +21,9 @@
             <Button Name="GenerateNewMapButton" Click="GenerateNewMapButton_Click" Padding="24">Generate new map</Button>
         </StackPanel>
         <views:SimulationView Name="SimulationView" Grid.Column="0" IsHitTestVisible="False" />
-        <TextBlock Name="FpsText" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Top" Padding="8,4" Background="#C0000000" Foreground="White" IsHitTestVisible="False">FPS: 0</TextBlock>
+        <StackPanel Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Top" Background="#C0000000" IsHitTestVisible="False">
+            <TextBlock Name="FpsText" Padding="8,4,8,0" Foreground="White">FPS: 0</TextBlock>
+            <TextBlock Name="GenerationText" Padding="8,0,8,4" Foreground="White">Generation: 1 (1 being trained)</TextBlock>
+        </StackPanel>
     </Grid>
 </Window>

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -37,6 +38,8 @@ public partial class MainWindow : Window
     private bool _isTraining;
     private bool _isGenerationsTextValid;
     private int _generationsPerBatch = 1;
+    private int _generationBeingDrawn = 1;
+    private int _generationBeingTrained = 1;
 
     private Map? _map;
     private IGeneration<CarSimulation> _currentGeneration;
@@ -80,6 +83,7 @@ public partial class MainWindow : Window
         DispatcherTimer.Run(() =>
         {
             FpsText.Text = $"FPS: {_fpsCounter.ReadFramesPerSecond():0}";
+            UpdateGenerationText();
             return true;
         }, TimeSpan.FromSeconds(1));
     }
@@ -149,6 +153,7 @@ public partial class MainWindow : Window
     {
         _isTraining = true;
         UpdateButtons();
+        DisplayKeepAwake.Start();
 
         try
         {
@@ -158,6 +163,9 @@ public partial class MainWindow : Window
                     GenerateNewMap();
 
                 var generationToDraw = _currentGeneration.Clone();
+                _generationBeingDrawn = Volatile.Read(ref _generationBeingTrained);
+                UpdateGenerationText();
+
                 var generationsPerBatch = _generationsPerBatch;
 
                 var drawing = Task.Run(() => DrawRun(generationToDraw));
@@ -169,6 +177,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            DisplayKeepAwake.Stop();
             _isTraining = false;
             UpdateButtons();
         }
@@ -190,11 +199,17 @@ public partial class MainWindow : Window
         {
             var stopwatch = Stopwatch.StartNew();
             _currentGeneration = _currentGeneration.EvolveInParallel(TrainingThreadCount);
+            Interlocked.Increment(ref _generationBeingTrained);
             _generationsPerBatchController.AddRun(stopwatch.Elapsed);
 
             if (drawing.IsCompleted)
                 return;
         }
+    }
+
+    private void UpdateGenerationText()
+    {
+        GenerationText.Text = $"Generation: {_generationBeingDrawn} ({Volatile.Read(ref _generationBeingTrained)} being trained)";
     }
 
     private void UpdateGenerationsPerBatch()
