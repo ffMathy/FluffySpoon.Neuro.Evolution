@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
@@ -8,7 +9,6 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using FluffySpoon.Neuro.Evolution.Domain.Genomics;
 using FluffySpoon.Neuro.Evolution.Infrastructure.Settings;
-using FluffySpoon.Neuro.Evolution.Sample.Helpers;
 using FluffySpoon.Neuro.Evolution.Sample.Models;
 using FluffySpoon.Neuro.Evolution.Sample.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +20,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Views;
 public partial class MainWindow : Window
 {
     private readonly Random _random;
-    private readonly DirectionHelper _directionHelper;
+    private readonly MapGeneratorService _mapGeneratorService;
 
     private bool _keepRunning;
     private bool _render;
@@ -32,12 +32,12 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         _random = new Random();
-        _directionHelper = new DirectionHelper(_random);
+        _mapGeneratorService = new MapGeneratorService(_random);
 
         _render = true;
 
         InitializeComponent();
-        GenerateNewMap();
+        SetMap(_mapGeneratorService.PickRandomPredefinedMap());
 
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddFluffySpoonNeuroEvolution(
@@ -84,7 +84,15 @@ public partial class MainWindow : Window
 
     private void GenerateNewMapButton_Click(object sender, RoutedEventArgs e)
     {
-        GenerateNewMap();
+        SetMap(_mapGeneratorService.GenerateRandomMap());
+
+        // The next generation's simulations were already created on the previous map.
+        // Cloning gives them new simulations on this map, while keeping what their networks have learned.
+        foreach (var genome in _currentGeneration.Genomes.ToArray())
+        {
+            _currentGeneration.AddGenome(genome.Clone());
+            _currentGeneration.RemoveGenome(genome);
+        }
     }
 
     private async void TrainGenerationButton_Click(object sender, RoutedEventArgs e)
@@ -133,12 +141,9 @@ public partial class MainWindow : Window
         GenerateNewMapButton.IsEnabled = isEnabled;
     }
 
-    private void GenerateNewMap()
+    private void SetMap(Map map)
     {
-        var mapGeneratorService = new MapGeneratorService(
-            _random,
-            _directionHelper);
-        _map = mapGeneratorService.PickRandomPredefinedMap();
+        _map = map;
 
         MapCanvas.Children.Clear();
         RenderMap();

@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluffySpoon.Neuro.Evolution\FluffySpoon.Neuro.Evolution.csproj" />
+    <ProjectReference Include="..\FluffySpoon.Neuro.Evolution.Sample\FluffySpoon.Neuro.Evolution.Sample.csproj" />
   </ItemGroup>
 
 </Project>

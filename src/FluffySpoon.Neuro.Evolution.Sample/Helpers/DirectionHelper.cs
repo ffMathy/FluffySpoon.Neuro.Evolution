@@ -1,29 +1,10 @@
 ﻿using System;
-using System.Linq;
 using FluffySpoon.Neuro.Evolution.Sample.Models;
 
 namespace FluffySpoon.Neuro.Evolution.Sample.Helpers
 {
-    public class DirectionHelper
+    public static class DirectionHelper
     {
-        private readonly Random _random;
-
-        public DirectionHelper(Random random)
-        {
-            _random = random;
-        }
-
-        public Direction GetRandomDirectionOtherThan(
-            params Direction[] directions)
-        {
-            while (true)
-            {
-                var direction = GetRandomDirection();
-                if (!directions.Contains(direction))
-                    return direction;
-            }
-        }
-
         public static float GetClockwiseAngleBetweenDirections(
             Direction a,
             Direction b)
@@ -86,11 +67,6 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Helpers
             }
 
             throw new InvalidOperationException("Unknown combined direction.");
-        }
-
-        public Direction GetRandomDirection()
-        {
-            return (Direction)_random.Next(0, 4);
         }
 
         public static Direction GetOppositeDirection(Direction direction)
