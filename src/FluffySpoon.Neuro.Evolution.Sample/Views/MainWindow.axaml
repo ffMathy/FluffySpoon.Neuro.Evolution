@@ -18,6 +18,7 @@
             </StackPanel>
             <TextBlock Name="AverageRunTimeText" />
             <TextBlock Name="MutationText" />
+            <TextBlock Name="GenomeCountText" />
             <Button Name="TrainButton" Click="TrainButton_Click" Padding="24">Train</Button>
             <Button Name="GenerateNewMapButton" Click="GenerateNewMapButton_Click" Padding="24">Generate new map</Button>
         </StackPanel>

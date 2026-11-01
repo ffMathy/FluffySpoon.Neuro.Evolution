@@ -27,6 +27,11 @@ public partial class MainWindow : Window
     /// </summary>
     private static readonly int TrainingThreadCount = Math.Max(1, Environment.ProcessorCount - 2);
 
+    /// <summary>
+    /// Shorter runs don't have enough frames to say anything reliable about the frame rate.
+    /// </summary>
+    private static readonly TimeSpan MinimumRunTimeToMeasureFrameRate = TimeSpan.FromSeconds(0.5);
+
     private readonly Stopwatch _drawnRunStopwatch = new();
 
     private readonly Random _random;
@@ -34,6 +39,7 @@ public partial class MainWindow : Window
     private readonly FpsCounter _fpsCounter = new();
     private readonly GenerationsPerBatchController _generationsPerBatchController = new();
     private readonly AdaptiveMutationController _adaptiveMutationController = new();
+    private readonly GenomeCountController _genomeCountController = new();
     private readonly EvolutionSettings<CarSimulation> _evolutionSettings;
 
     private bool _keepRunning;
@@ -42,6 +48,7 @@ public partial class MainWindow : Window
     private int _generationsPerBatch = 1;
     private int _generationBeingDrawn = 1;
     private int _generationBeingTrained = 1;
+    private int _framesInDrawnRun;
 
     private Map? _map;
     private IGeneration<CarSimulation> _currentGeneration;
@@ -66,8 +73,8 @@ public partial class MainWindow : Window
 
         _evolutionSettings = new EvolutionSettings<CarSimulation>()
         {
-            AmountOfGenomesInPopulation = 125,
-            AmountOfWorstGenomesToRemovePerGeneration = 100,
+            AmountOfGenomesInPopulation = GenomeCountController.InitialGenomeCount,
+            AmountOfWorstGenomesToRemovePerGeneration = GenomeCountController.GetGenomesToRemove(GenomeCountController.InitialGenomeCount),
             NeuronCounts = new[] { 7, 6, 2 },
             MutationProbability = _adaptiveMutationController.MutationProbability,
             MutationStrength = _adaptiveMutationController.MutationStrength,
@@ -82,7 +89,11 @@ public partial class MainWindow : Window
         var serviceProvider = serviceCollection.BuildServiceProvider();
         _currentGeneration = serviceProvider.GetRequiredService<IGeneration<CarSimulation>>();
 
-        SimulationView.FrameDrawn += _fpsCounter.AddFrame;
+        SimulationView.FrameDrawn += () =>
+        {
+            _fpsCounter.AddFrame();
+            _framesInDrawnRun++;
+        };
         DispatcherTimer.Run(() =>
         {
             FpsText.Text = $"FPS: {_fpsCounter.ReadFramesPerSecond():0}";
@@ -171,11 +182,14 @@ public partial class MainWindow : Window
 
                 var generationsPerBatch = _generationsPerBatch;
 
+                _framesInDrawnRun = 0;
+
                 var drawing = Task.Run(() => DrawRun(generationToDraw));
                 var training = Task.Run(() => TrainBatch(generationsPerBatch, drawing));
                 await Task.WhenAll(drawing, training);
 
                 UpdateGenerationsPerBatch();
+                UpdateGenomeCount();
             } while (_keepRunning);
         }
         finally
@@ -222,8 +236,24 @@ public partial class MainWindow : Window
         _evolutionSettings.MutationStrength = _adaptiveMutationController.MutationStrength;
     }
 
+    /// <summary>
+    /// Only called between batches, since nothing is reading the settings then. The frame rate is measured
+    /// from the drawn run alone, since waiting for training afterwards doesn't say anything about the cost of drawing.
+    /// </summary>
+    private void UpdateGenomeCount()
+    {
+        var runTime = _drawnRunStopwatch.Elapsed;
+        if (runTime < MinimumRunTimeToMeasureFrameRate)
+            return;
+
+        var genomeCount = _genomeCountController.GetNextGenomeCount(_framesInDrawnRun / runTime.TotalSeconds);
+        _evolutionSettings.AmountOfGenomesInPopulation = genomeCount;
+        _evolutionSettings.AmountOfWorstGenomesToRemovePerGeneration = GenomeCountController.GetGenomesToRemove(genomeCount);
+    }
+
     private void UpdateGenerationText()
     {
+        GenomeCountText.Text = $"Genomes per generation: {_evolutionSettings.AmountOfGenomesInPopulation}";
         MutationText.Text = $"Mutation: {_evolutionSettings.MutationProbability:P0} chance, {_evolutionSettings.MutationStrength:0.00} strength";
         GenerationText.Text = $"Generation: {_generationBeingDrawn} ({Volatile.Read(ref _generationBeingTrained)} being trained)";
     }
