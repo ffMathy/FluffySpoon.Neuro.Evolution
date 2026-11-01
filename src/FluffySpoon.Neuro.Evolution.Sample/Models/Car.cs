@@ -7,9 +7,15 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Models
     {
         public const int Size = 30;
 
-        public const float MinimumSpeed = 1;
+        public const float MinimumSpeed = 3;
         public const float MaximumSpeed = 40;
         public const float MaximumTurnAngleVelocity = 5;
+
+        /// <summary>
+        /// How much of <see cref="MaximumTurnAngleVelocity"/> is left at <see cref="MaximumSpeed"/>.
+        /// The rest of the speeds are in between, so that the faster a car goes, the less it can turn.
+        /// </summary>
+        private const float TurnAbilityAtMaximumSpeed = 0.25f;
 
         public BoundingBox BoundingBox { get; }
 
@@ -17,6 +23,15 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Models
 
         public float TurnAngle { get; private set; }
         public float TurnAngleVelocity { get; private set; }
+
+        public float TurnAngleVelocityLimit
+        {
+            get
+            {
+                var speedFraction = (SpeedVelocity - MinimumSpeed) / (MaximumSpeed - MinimumSpeed);
+                return MaximumTurnAngleVelocity * (1 - (speedFraction * (1 - TurnAbilityAtMaximumSpeed)));
+            }
+        }
 
         public Line ForwardDirectionLine
         {
@@ -58,9 +73,9 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Models
             var previousAngleVelocity = TurnAngleVelocity;
             TurnAngleVelocity += deltaAngle;
 
-            const float threshold = MaximumTurnAngleVelocity;
+            var threshold = TurnAngleVelocityLimit;
 
-            if (TurnAngleVelocity < -threshold) { 
+            if (TurnAngleVelocity < -threshold) {
                 TurnAngleVelocity = -threshold;
             } else if (TurnAngleVelocity > threshold) { 
                 TurnAngleVelocity = threshold;
