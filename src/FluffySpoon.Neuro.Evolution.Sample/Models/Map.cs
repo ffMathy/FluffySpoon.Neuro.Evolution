@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -12,7 +12,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Models
         /// <summary>
         /// How far sensors can see. Anything further away reads the same as seeing nothing.
         /// </summary>
-        public const int SensorRangeInTiles = 3;
+        public const int SensorRangeInTiles = 6;
 
         private readonly Dictionary<(int X, int Y), Line[]> _wallLinesInSensorRangeByTile;
 

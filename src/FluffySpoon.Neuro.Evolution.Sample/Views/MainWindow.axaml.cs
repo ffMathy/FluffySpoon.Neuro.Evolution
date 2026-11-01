@@ -33,6 +33,8 @@ public partial class MainWindow : Window
     private readonly MapGeneratorService _mapGeneratorService;
     private readonly FpsCounter _fpsCounter = new();
     private readonly GenerationsPerBatchController _generationsPerBatchController = new();
+    private readonly AdaptiveMutationController _adaptiveMutationController = new();
+    private readonly EvolutionSettings<CarSimulation> _evolutionSettings;
 
     private bool _keepRunning;
     private bool _isTraining;
@@ -62,19 +64,20 @@ public partial class MainWindow : Window
             .GetObservable(TextBox.TextProperty)
             .Subscribe(GenerationsTextBox_TextChanged);
 
+        _evolutionSettings = new EvolutionSettings<CarSimulation>()
+        {
+            AmountOfGenomesInPopulation = 125,
+            AmountOfWorstGenomesToRemovePerGeneration = 100,
+            NeuronCounts = new[] { 7, 6, 2 },
+            MutationProbability = _adaptiveMutationController.MutationProbability,
+            MutationStrength = _adaptiveMutationController.MutationStrength,
+            RandomnessProvider = _random,
+            SimulationFactoryMethod = () => new CarSimulation(_map ?? throw new Exception("No map has been generated yet.")),
+            PostTickMethod = RenderGenomes
+        };
+
         var serviceCollection = new ServiceCollection();
-        serviceCollection.AddFluffySpoonNeuroEvolution(
-            new EvolutionSettings<CarSimulation>()
-            {
-                AmountOfGenomesInPopulation = 125,
-                AmountOfWorstGenomesToRemovePerGeneration = 100,
-                NeuronCounts = new[] { 7, 6, 2 },
-                MutationProbability = 0.1f,
-                MutationStrength = 0.3f,
-                RandomnessProvider = _random,
-                SimulationFactoryMethod = () => new CarSimulation(_map ?? throw new Exception("No map has been generated yet.")),
-                PostTickMethod = RenderGenomes
-            });
+        serviceCollection.AddFluffySpoonNeuroEvolution(_evolutionSettings);
 
         var serviceProvider = serviceCollection.BuildServiceProvider();
         _currentGeneration = serviceProvider.GetRequiredService<IGeneration<CarSimulation>>();
@@ -197,18 +200,31 @@ public partial class MainWindow : Window
     {
         for (var i = 0; i < generationsPerBatch; i++)
         {
+            // Evolving empties the generation, so the genomes have to be held on to in order to read their fitness.
+            var genomes = _currentGeneration.Genomes.ToArray();
+
             var stopwatch = Stopwatch.StartNew();
             _currentGeneration = _currentGeneration.EvolveInParallel(TrainingThreadCount);
             Interlocked.Increment(ref _generationBeingTrained);
             _generationsPerBatchController.AddRun(stopwatch.Elapsed);
+
+            _adaptiveMutationController.AddGeneration(genomes.Min(genome => genome.Simulation.Fitness));
+            ApplyMutationSettings();
 
             if (drawing.IsCompleted)
                 return;
         }
     }
 
+    private void ApplyMutationSettings()
+    {
+        _evolutionSettings.MutationProbability = _adaptiveMutationController.MutationProbability;
+        _evolutionSettings.MutationStrength = _adaptiveMutationController.MutationStrength;
+    }
+
     private void UpdateGenerationText()
     {
+        MutationText.Text = $"Mutation: {_evolutionSettings.MutationProbability:P0} chance, {_evolutionSettings.MutationStrength:0.00} strength";
         GenerationText.Text = $"Generation: {_generationBeingDrawn} ({Volatile.Read(ref _generationBeingTrained)} being trained)";
     }
 
@@ -246,6 +262,8 @@ public partial class MainWindow : Window
     {
         _map = map;
         _generationsPerBatchController.ForgetRuns();
+        _adaptiveMutationController.ForgetProgress();
+        ApplyMutationSettings();
         SimulationView.SetMap(map);
     }
 

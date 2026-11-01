@@ -62,6 +62,27 @@ public class ConvergenceTest
     }
 
     [TestMethod]
+    public void Mutate_UsesMutationSettingsChangedAfterCreation()
+    {
+        var (generation, settings) = CreateGeneration();
+        var genome = generation.Clone().Genomes.First().Clone();
+        var weightsBefore = GetWeights(genome);
+
+        settings.MutationProbability = 0;
+        genome.Mutate();
+        CollectionAssert.AreEqual(weightsBefore, GetWeights(genome));
+
+        settings.MutationProbability = 1;
+        genome.Mutate();
+        CollectionAssert.AreNotEqual(weightsBefore, GetWeights(genome));
+    }
+
+    private static float[] GetWeights(IGenome<XorSimulation> genome) => genome.NeuralNetwork.Neurons
+        .SelectMany(x => x.DendritesTowardsNextLayer)
+        .Select(x => x.Weight)
+        .ToArray();
+
+    [TestMethod]
     public void Clone_RunsIndependentlyOfOriginal()
     {
         var (generation, settings) = CreateGeneration();

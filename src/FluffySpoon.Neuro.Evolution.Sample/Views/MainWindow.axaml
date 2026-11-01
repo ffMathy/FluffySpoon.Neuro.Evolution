@@ -17,6 +17,7 @@
                 <TextBox Name="GenerationsTextBox" Text="1" Width="100" />
             </StackPanel>
             <TextBlock Name="AverageRunTimeText" />
+            <TextBlock Name="MutationText" />
             <Button Name="TrainButton" Click="TrainButton_Click" Padding="24">Train</Button>
             <Button Name="GenerateNewMapButton" Click="GenerateNewMapButton_Click" Padding="24">Generate new map</Button>
         </StackPanel>
