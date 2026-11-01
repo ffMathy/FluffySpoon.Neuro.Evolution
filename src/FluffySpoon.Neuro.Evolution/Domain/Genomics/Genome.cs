@@ -42,14 +42,17 @@ public class Genome<TSimulation> : IGenome<TSimulation> where TSimulation : ISim
         }
     }
 
+    /// <summary>
+    /// Each gene (bias or weight) has a <see cref="INeuralNetworkSettings.MutationProbability"/> chance of being nudged
+    /// by gaussian noise scaled by <see cref="INeuralNetworkSettings.MutationStrength"/>.
+    /// </summary>
     private float MutateNeuronValue(float value)
     {
-        value = _evolutionSettings.RandomnessProvider.NextFloat(0f, _evolutionSettings.MutationProbability) <= 5
-            ? _evolutionSettings.RandomnessProvider.NextFloat(
-                -_evolutionSettings.MutationStrength, 
-                _evolutionSettings.MutationStrength)
-            : value;
-        return value;
+        var random = _evolutionSettings.RandomnessProvider;
+        if (random.NextDouble() >= _evolutionSettings.MutationProbability)
+            return value;
+
+        return value + random.NextGaussian() * _evolutionSettings.MutationStrength;
     }
 
     public void Tick()

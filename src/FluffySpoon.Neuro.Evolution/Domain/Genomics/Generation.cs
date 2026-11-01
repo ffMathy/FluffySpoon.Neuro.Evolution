@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using FluffySpoon.Neuro.Evolution.Infrastructure.Settings;
 
@@ -10,13 +11,15 @@ public enum SimulationResult
     InProgress
 }
 
+/// <summary>
+/// A population of genomes. Note that a <b>lower</b> <see cref="ISimulation.Fitness"/> is considered better.
+/// </summary>
 public class Generation<TSimulation> : IGeneration<TSimulation> where TSimulation : ISimulation
 {
     private readonly IEvolutionSettings<TSimulation> _evolutionSettings;
     private readonly IGenomeFactory<TSimulation> _genomeFactory;
 
-    private HashSet<IGenome<TSimulation>> _genomes;
-    private readonly LinkedList<IGenome<TSimulation>> _bestGenomes;
+    private readonly List<IGenome<TSimulation>> _genomes;
 
     public IReadOnlyCollection<IGenome<TSimulation>> Genomes => _genomes;
 
@@ -24,12 +27,16 @@ public class Generation<TSimulation> : IGeneration<TSimulation> where TSimulatio
         IEvolutionSettings<TSimulation> evolutionSettings,
         IGenomeFactory<TSimulation> genomeFactory)
     {
-        _genomes = new HashSet<IGenome<TSimulation>>();
-        _bestGenomes = new LinkedList<IGenome<TSimulation>>();
+        _genomes = new List<IGenome<TSimulation>>();
 
         _evolutionSettings = evolutionSettings;
         _genomeFactory = genomeFactory;
     }
+
+    private int AmountOfGenomesToKeep => Math.Clamp(
+        _evolutionSettings.AmountOfGenomesInPopulation - _evolutionSettings.AmountOfWorstGenomesToRemovePerGeneration,
+        1,
+        Math.Max(1, _evolutionSettings.AmountOfGenomesInPopulation));
 
     public void AddGenome(IGenome<TSimulation> genome)
     {
@@ -38,126 +45,90 @@ public class Generation<TSimulation> : IGeneration<TSimulation> where TSimulatio
 
     public void RemoveGenome(IGenome<TSimulation> genome)
     {
-        _genomes.Remove(genome);
-        genome.Dispose();
+        if (_genomes.Remove(genome))
+            genome.Dispose();
     }
 
-    public IGenome<TSimulation> PickRandomGenome()
-    {
-        var random = _evolutionSettings.RandomnessProvider;
-        return _genomes
-            .Skip(random.Next(0, _genomes.Count))
-            .First();
-    }
-
-    /// <returns>True if all simulations have ended.</returns>
     private SimulationResult Tick()
     {
         InitializeIfNeeded();
 
         var endedCount = 0;
-
-        _bestGenomes.Clear();
-
         foreach (var genome in _genomes)
         {
             genome.Tick();
 
             if (genome.Simulation.HasEnded)
                 endedCount++;
-
-            CheckIfGenomeIsAmongBestGenomes(genome);
         }
 
-        _evolutionSettings.PostTickMethod?.Invoke(new Genomes<TSimulation>(
-            _genomes,
-            _bestGenomes));
+        if (_evolutionSettings.PostTickMethod != null)
+        {
+            var best = GetGenomesOrderedByFitness()
+                .Take(AmountOfGenomesToKeep)
+                .ToList();
+            _evolutionSettings.PostTickMethod(new Genomes<TSimulation>(_genomes, best));
+        }
 
         return endedCount == _genomes.Count ?
-                SimulationResult.Ended :
-                SimulationResult.InProgress;
+            SimulationResult.Ended :
+            SimulationResult.InProgress;
     }
 
-    private void CheckIfGenomeIsAmongBestGenomes(IGenome<TSimulation> genome)
-    {
-        var lowestBestGenomeSoFar = _bestGenomes.Last?.Value;
-        var currentFitness = genome.Simulation.Fitness;
-        if (lowestBestGenomeSoFar != null && currentFitness >= lowestBestGenomeSoFar.Simulation.Fitness)
-            return;
-
-        var nodeToInsertAt = _bestGenomes.Last;
-        while (nodeToInsertAt?.Value != null && nodeToInsertAt.Value.Simulation.Fitness < currentFitness)
-            nodeToInsertAt = nodeToInsertAt.Previous;
-
-        if (nodeToInsertAt == null)
-        {
-            _bestGenomes.AddFirst(genome);
-        }
-        else
-        {
-            _bestGenomes.AddBefore(nodeToInsertAt, genome);
-        }
-
-        var amountOfGenomesToKeep =
-            _evolutionSettings.AmountOfGenomesInPopulation -
-            _evolutionSettings.AmountOfWorstGenomesToRemovePerGeneration;
-        if (_bestGenomes.Count > amountOfGenomesToKeep)
-            _bestGenomes.RemoveLast();
-    }
+    private IEnumerable<IGenome<TSimulation>> GetGenomesOrderedByFitness() => _genomes
+        .OrderBy(x => x.Simulation.Fitness);
 
     private void InitializeIfNeeded()
     {
-        if (_genomes.Count > 0)
-            return;
-
         while (_genomes.Count < _evolutionSettings.AmountOfGenomesInPopulation)
             _genomes.Add(_genomeFactory.Create());
     }
 
+    /// <summary>
+    /// Runs all simulations of this generation to completion and then breeds the next generation:
+    /// the best genomes survive unchanged (elitism), and the worst ones are replaced by mutated
+    /// offspring of the survivors. Every genome in the next generation gets a fresh simulation.
+    /// </summary>
     public IGeneration<TSimulation> Evolve()
     {
         // ReSharper disable once EmptyEmbeddedStatement
-        while(Tick() == SimulationResult.InProgress);
+        while (Tick() == SimulationResult.InProgress) ;
 
-        var generationClone = Clone();
-        generationClone.RemoveWorstPerformingGenomes();
-        generationClone.BreedNewGenomesBasedOnBestGenome();
+        var survivors = GetGenomesOrderedByFitness()
+            .Take(AmountOfGenomesToKeep)
+            .ToList();
 
-        return generationClone;
-    }
-
-    private void BreedNewGenomesBasedOnBestGenome()
-    {
-        var bestGenome = _genomes
-            .OrderBy(x => x.Simulation.Fitness)
-            .First();
-        
-        var clone = bestGenome.Clone();
-        clone.Mutate();
-
-        AddGenome(clone);
-    }
-
-    public void RemoveWorstPerformingGenomes()
-    {
-        var worstPerformingGenomes = _genomes
-            .OrderByDescending(x => x.Simulation.Fitness)
-            .Take(_evolutionSettings.AmountOfWorstGenomesToRemovePerGeneration);
-
-        foreach (var genome in worstPerformingGenomes)
-            RemoveGenome(genome);
-    }
-
-    private Generation<TSimulation> Clone()
-    {
-        var genomesClone = _genomes.Select(x => x.Clone());
-        var generation = new Generation<TSimulation>(
+        var nextGeneration = new Generation<TSimulation>(
             _evolutionSettings,
-            _genomeFactory)
-        {
-            _genomes = new HashSet<IGenome<TSimulation>>(genomesClone)
-        };
+            _genomeFactory);
 
-        return generation;
+        foreach (var survivor in survivors)
+            nextGeneration.AddGenome(survivor.Clone());
+
+        while (nextGeneration._genomes.Count < _evolutionSettings.AmountOfGenomesInPopulation)
+        {
+            var child = PickParent(survivors).Clone();
+            child.Mutate();
+            nextGeneration.AddGenome(child);
+        }
+
+        foreach (var genome in _genomes)
+            genome.Dispose();
+
+        _genomes.Clear();
+
+        return nextGeneration;
+    }
+
+    /// <summary>
+    /// Rank-biased selection: better survivors are more likely to become parents,
+    /// while still giving the others a chance in order to preserve diversity.
+    /// </summary>
+    private IGenome<TSimulation> PickParent(IReadOnlyList<IGenome<TSimulation>> survivorsOrderedByFitness)
+    {
+        var random = _evolutionSettings.RandomnessProvider;
+        var r = random.NextDouble();
+        var index = (int)(r * r * survivorsOrderedByFitness.Count);
+        return survivorsOrderedByFitness[Math.Min(index, survivorsOrderedByFitness.Count - 1)];
     }
 }

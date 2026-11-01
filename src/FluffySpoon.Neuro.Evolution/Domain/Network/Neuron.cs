@@ -14,8 +14,3 @@ public record Dendrite(Neuron Source, Neuron Destination)
 {
     public float Weight { get; set; }
 }
-
-public record NeuronComputation(Neuron Neuron)
-{
-    public float Activation { get; set; } = 0f;
-}

@@ -35,11 +35,27 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
 
         private readonly IDictionary<int, List<ProgressLine>> _allProgressLinesByMapNodeOffset;
 
-        private int _laps;
-        private int _lastProgressLineOffset;
+        /// <summary>
+        /// How many ticks a car may go without reaching new progress before it is considered stuck.
+        /// </summary>
+        private const int MaximumTicksWithoutProgress = 150;
 
-        private long _lastProgressLineIncreaseTick;
-        private int _highestProgressLineOffset;
+        /// <summary>
+        /// The simulation ends once a car has driven this many laps.
+        /// </summary>
+        private const int LapsToComplete = 2;
+
+        /// <summary>
+        /// Sensor distances are divided by this value so that the network receives inputs roughly in the range [0, 1].
+        /// </summary>
+        private const float SensorNormalizationDistance = (float)Map.TileSize * 3;
+
+        private readonly int _progressLineCount;
+
+        private int _laps;
+
+        private long _lastProgressIncreaseTick;
+        private int _highestProgress;
 
         public long TicksSurvived { get; set; }
 
@@ -53,20 +69,22 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
 
         public bool HasEnded { get; private set; }
 
-        public double Fitness
-        {
-            get
-            {
-                var mapNodesLength = _map.Nodes.Length;
+        /// <summary>
+        /// The total amount of progress lines passed, including full laps. Can be negative when driving backwards.
+        /// </summary>
+        public int ProgressLineCount => _progressLineCount;
 
-                var progressPenalty = mapNodesLength - CurrentProgressLine.Offset;
-                var lapPenalty = mapNodesLength * _laps;
+        public int Progress => (_laps * _progressLineCount) + (CurrentProgressLine.Offset - 1);
 
-                var timePenalty = -TicksSurvived * 10;
-
-                return timePenalty + ((progressPenalty - lapPenalty) * 30);
-            }
-        }
+        /// <summary>
+        /// Lower is better. Cars are ranked by how far they got along the track.
+        /// Once a car completes all laps, the time it took becomes a tie-breaker so that faster cars win.
+        /// Speed is deliberately not rewarded before that, since it would push the population towards
+        /// driving fast and crashing in tight corners instead of learning to brake.
+        /// </summary>
+        public double Fitness => _laps >= LapsToComplete
+            ? (-Progress * 100d) + (TicksSurvived / 100d)
+            : -Progress * 100d;
 
         public CarSimulation(
             Map map)
@@ -87,13 +105,13 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
                     x => x.Key,
                     x => x.ToList());
 
-            _lastProgressLineOffset = allProgressLines.Last().Offset;
+            _progressLineCount = allProgressLines.Last().Offset;
 
             HasEnded = false;
             TicksSurvived = 0;
             _laps = 0;
 
-            CurrentProgressLine = _map.Nodes.First().ProgressLines.First();
+            CurrentProgressLine = allProgressLines.First();
         }
 
         private ProgressLine GetClosestIntersectionPointProgressLine()
@@ -165,7 +183,20 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
             }
 
             if (carSensorReadings.Count == 0)
-                throw new InvalidOperationException("No sensor reading could be made.");
+            {
+                // The ray escaped through a gap in the walls (e.g. a corner). Treat it as "nothing in sight".
+                var direction = sensorLine.End - sensorLine.Start;
+                var length = direction.GetDistanceTo(new Point(0, 0));
+                return new CarSensorReading()
+                {
+                    IntersectionPoint = length == 0
+                        ? sensorLine.Start
+                        : new Point(
+                            sensorLine.Start.X + (direction.X * SensorNormalizationDistance / length),
+                            sensorLine.Start.Y + (direction.Y * SensorNormalizationDistance / length)),
+                    Distance = SensorNormalizationDistance
+                };
+            }
 
             return carSensorReadings.MinBy(x => x.Distance);
         }
@@ -189,14 +220,19 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
             SensorReadings = GetSensorReadings();
             return new float[]
             {
-                SensorReadings.LeftSensor.Distance,
-                SensorReadings.LeftCenterSensor.Distance,
-                SensorReadings.CenterSensor.Distance,
-                SensorReadings.RightCenterSensor.Distance,
-                SensorReadings.RightSensor.Distance,
-                Car.SpeedVelocity,
-                Car.TurnAngle
+                NormalizeSensorDistance(SensorReadings.LeftSensor),
+                NormalizeSensorDistance(SensorReadings.LeftCenterSensor),
+                NormalizeSensorDistance(SensorReadings.CenterSensor),
+                NormalizeSensorDistance(SensorReadings.RightCenterSensor),
+                NormalizeSensorDistance(SensorReadings.RightSensor),
+                (Car.SpeedVelocity - Car.MinimumSpeed) / (Car.MaximumSpeed - Car.MinimumSpeed),
+                Car.TurnAngleVelocity / Car.MaximumTurnAngleVelocity
             };
+        }
+
+        private static float NormalizeSensorDistance(CarSensorReading reading)
+        {
+            return Math.Min(1f, reading.Distance / SensorNormalizationDistance);
         }
 
         public void Tick(float[] outputs)
@@ -215,10 +251,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
 
             Car.Tick();
 
-            var previousProgressLine = CurrentProgressLine;
-            var newProgressLine = GetClosestIntersectionPointProgressLine();
-            if (previousProgressLine == null || Math.Abs(newProgressLine.Offset - previousProgressLine.Offset) < 3)
-                CurrentProgressLine = newProgressLine;
+            UpdateProgress();
 
             var mapNodeBoundingBoxes = new[]
             {
@@ -229,15 +262,6 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
                 CurrentMapNode.Next.Next.BoundingBox
             };
 
-            if (newProgressLine.Offset > _highestProgressLineOffset || (newProgressLine.Offset == 0 && previousProgressLine.Offset == _lastProgressLineOffset))
-            {
-                _lastProgressLineIncreaseTick = TicksSurvived;
-                _lastProgressLineOffset = previousProgressLine.Offset;
-                _highestProgressLineOffset = newProgressLine.Offset;
-            }
-
-            CheckForNewLapCount(previousProgressLine);
-
             var isWithinAnyNode = Car.BoundingBox.IsWithin(mapNodeBoundingBoxes);
             if (!isWithinAnyNode)
             {
@@ -247,38 +271,46 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
 
             TicksSurvived++;
 
-            if (_lastProgressLineIncreaseTick != 0)
+            if (Progress > _highestProgress)
             {
-                var timeSinceLastProgressLineIncrease = TicksSurvived - _lastProgressLineIncreaseTick;
-                if (timeSinceLastProgressLineIncrease > 600)
-                {
-                    HasEnded = true;
-                    return;
-                }
+                _highestProgress = Progress;
+                _lastProgressIncreaseTick = TicksSurvived;
             }
 
-            if (Fitness > 3000)
+            if (TicksSurvived - _lastProgressIncreaseTick > MaximumTicksWithoutProgress)
             {
                 HasEnded = true;
                 return;
             }
+
+            if (_laps >= LapsToComplete)
+            {
+                HasEnded = true;
+            }
         }
 
-        private void CheckForNewLapCount(ProgressLine previousProgressLine)
+        private void UpdateProgress()
         {
-            if (previousProgressLine == null)
-            {
-                return;
-            }
+            var previousProgressLine = CurrentProgressLine;
+            var newProgressLine = GetClosestIntersectionPointProgressLine();
 
-            if (CurrentProgressLine.Offset == 0 && previousProgressLine.Offset == _lastProgressLineOffset)
-            {
+            // Offsets wrap around at the finish line, so compute the shortest signed distance around the loop.
+            var delta = newProgressLine.Offset - previousProgressLine.Offset;
+            if (delta > _progressLineCount / 2)
+                delta -= _progressLineCount;
+            else if (delta < -_progressLineCount / 2)
+                delta += _progressLineCount;
+
+            // Ignore jumps; a car can only move a couple of progress lines per tick.
+            if (Math.Abs(delta) >= 3)
+                return;
+
+            if (delta > 0 && newProgressLine.Offset < previousProgressLine.Offset)
                 _laps++;
-            }
-            else if (previousProgressLine.Offset == 0 && CurrentProgressLine.Offset == _lastProgressLineOffset)
-            {
+            else if (delta < 0 && newProgressLine.Offset > previousProgressLine.Offset)
                 _laps--;
-            }
+
+            CurrentProgressLine = newProgressLine;
         }
 
         public void Dispose()

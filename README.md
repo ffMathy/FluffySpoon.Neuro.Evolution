@@ -1,96 +1,65 @@
 # FluffySpoon.Neuro.Evolution
 
+Neuroevolution for .NET: a population of small feed-forward neural networks is evolved with a genetic algorithm.
+Each generation, every genome drives its own `ISimulation` until it ends; the best genomes survive unchanged and
+the worst ones are replaced by mutated offspring of the survivors.
+
+Key conventions:
+
+- **Lower `Fitness` is better.** For "distance travelled", return `-distanceTravelled`.
+- Inputs can be any range, but the network learns far better if you normalize them to roughly `[-1, 1]`.
+- Outputs are always in the range `[0, 1]`. Use `NeuronInterpretationHelper` to turn them into booleans or enum values.
+
 ```csharp
-namespace FluffySpoon.Neuro.Evolution.Sample
+var serviceCollection = new ServiceCollection();
+serviceCollection.AddFluffySpoonNeuroEvolution(new EvolutionSettings<CarSimulation>
 {
-    class Program
+    AmountOfGenomesInPopulation = 50,
+    AmountOfWorstGenomesToRemovePerGeneration = 40,
+
+    // 3 input neurons, 6 neurons in a hidden layer, 2 output neurons
+    NeuronCounts = new[] { 3, 6, 2 },
+
+    // chance that each weight/bias is changed on mutation, and the standard deviation of the change
+    MutationProbability = 0.15f,
+    MutationStrength = 0.5f,
+
+    SimulationFactoryMethod = () => new CarSimulation()
+});
+
+var serviceProvider = serviceCollection.BuildServiceProvider();
+
+var generation = serviceProvider.GetRequiredService<IGeneration<CarSimulation>>();
+for (var i = 0; i < 100; i++)
+    generation = generation.Evolve();
+
+class CarSimulation : ISimulation
+{
+    enum SteeringType { TurnLeft, DoNothing, TurnRight }
+
+    public int DistanceTravelled { get; private set; }
+
+    // lower is better
+    public double Fitness => -DistanceTravelled;
+
+    public bool HasEnded => DistanceTravelled > 10;
+
+    public float[] GetInputs()
     {
-        static async Task Main(string[] args)
-        {
-            var serviceCollection = new ServiceCollection();
-            serviceCollection.AddFluffySpoonNeuroEvolution(new EvolutionSettings<CarSimulation>() {
-                AmountOfGenomesInPopulation = 100,
-                AmountOfWorstGenomesToRemovePerGeneration = 10,
-
-                //3 input neurons, 4 neurons in 1st hidden layer, 5 neurons in 2nd hidden layer, 2 output neurons
-                NeuronCounts = new [] { 3, 4, 5, 2 },
-                
-                SimulationFactoryMethod = () => new CarSimulation()
-            });
-
-            var serviceProvider = serviceCollection.BuildServiceProvider();
-
-            var firstGeneration = serviceProvider.GetRequiredService<IGeneration<CarSimulation>>();
-            var secondGeneration = await firstGeneration.EvolveAsync();
-            var thirdGeneration = await secondGeneration.EvolveAsync();
-            //etc
-
-            var carSimulationsOfThirdGeneration = thirdGeneration.Genomes.Select(x => x.Simulation);
-            foreach(var carSimulationOfThirdGeneration in carSimulationsOfThirdGeneration)
-            {
-                //render the car simulation or something else.
-            }
-        }
+        // e.g. 3 LIDAR readings, normalized by the maximum sensor range
+        return new[] { 100f / 200f, 80f / 200f, 30f / 200f };
     }
 
-    class CarSimulation : ISimulation
+    public void Tick(float[] outputs)
     {
-        enum SteeringType
-        {
-            TurnLeft,
-            DoNothing,
-            TurnRight
-        }
+        var steering = NeuronInterpretationHelper.InterpretAsEnum<SteeringType>(outputs[0]);
+        var accelerate = NeuronInterpretationHelper.InterpretAsBoolean(outputs[1]);
 
-        enum AccelerationType
-        {
-            Accelerate,
-            DoNothing,
-            Decelerate
-        }
-
-        public int DistanceTravelled { get; private set; }
-
-        public double Fitness => -DistanceTravelled;
-
-        public bool HasEnded => DistanceTravelled > 10;
-
-        /// <summary>
-        /// This is called by the learning algorithm to determine the inputs to feed into the neural network.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<double[]> GetInputsAsync()
-        { 
-            //we simulate that 3 LIDAR sensor readings come in. 
-            //the left one reads 100 meters, the middle one reads 80 meters and the right one reads 30 meters. 
-            //these will be fed as input neurons.
-
-            return new double[]
-            {
-                100, //left sensor input neuron
-                80, //center sensor input neuron
-                30 //right sensor input neuron
-            };
-        }
-
-        /// <summary>
-        /// This is called by the learning algorithm with the neural network's suggestion on what to do based on the input that was given in <see cref="GetInputsAsync"/>.
-        /// </summary>
-        public async Task TickAsync(double[] outputs)
-        {
-            var steeringType = NeuronInterpretationHelper.InterpretAsEnum<SteeringType>(outputs[0]);
-            var accelerationType = NeuronInterpretationHelper.InterpretAsEnum<AccelerationType>(outputs[1]);
-
-            //do something here based on the steering type and acceleration type the neural net suggested.
-
-            if(accelerationType == AccelerationType.Accelerate)
-                DistanceTravelled++;
-        }
-
-        public async Task ResetAsync()
-        {
-            //reset car positions.
-        }
+        if (accelerate)
+            DistanceTravelled++;
     }
+
+    public void Dispose() { }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 ```
