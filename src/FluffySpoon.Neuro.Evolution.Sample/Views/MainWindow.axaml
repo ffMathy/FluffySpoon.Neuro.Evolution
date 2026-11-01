@@ -2,25 +2,25 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="using:FluffySpoon.Neuro.Evolution.Sample.Views"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="FluffySpoon.Neuro.Evolution.Sample.Views.MainWindow"
         Icon="/Assets/avalonia-logo.ico"
-        Title="FluffySpoon.Neuro.Evolution.Sample">
-    <Grid Background="Gray" ColumnDefinitions="*,*,*" RowDefinitions="Auto,*">
-        <StackPanel Grid.Row="0" Grid.Column="2" Spacing="12" Margin="12">
+        Title="FluffySpoon.Neuro.Evolution.Sample"
+        WindowState="Maximized">
+    <Grid Background="Gray" ColumnDefinitions="*,Auto">
+        <StackPanel Grid.Column="1" Spacing="12" Margin="12">
             <CheckBox Name="KeepRunningCheckbox" Checked="KeepRunningCheckbox_Checked" Unchecked="KeepRunningCheckbox_Unchecked">Keep running</CheckBox>
             <CheckBox Name="GenerateNewMapEachTimeCheckbox">Generate new map each time</CheckBox>
             <StackPanel Orientation="Horizontal" Spacing="12">
-                <TextBlock VerticalAlignment="Center">Generations to train each time</TextBlock>
+                <TextBlock VerticalAlignment="Center">Generations to train each time (adjusts automatically)</TextBlock>
                 <TextBox Name="GenerationsTextBox" Text="1" Width="100" />
             </StackPanel>
+            <TextBlock Name="AverageRunTimeText" />
             <Button Name="TrainButton" Click="TrainButton_Click" Padding="24">Train</Button>
             <Button Name="GenerateNewMapButton" Click="GenerateNewMapButton_Click" Padding="24">Generate new map</Button>
         </StackPanel>
-        <Canvas Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="1" Name="MapCanvas">
-            <Canvas.RenderTransform>
-                <ScaleTransform ScaleX="1" ScaleY="1" />
-            </Canvas.RenderTransform>
-        </Canvas>
+        <views:SimulationView Name="SimulationView" Grid.Column="0" IsHitTestVisible="False" />
+        <TextBlock Name="FpsText" Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Top" Padding="8,4" Background="#C0000000" Foreground="White" IsHitTestVisible="False">FPS: 0</TextBlock>
     </Grid>
 </Window>

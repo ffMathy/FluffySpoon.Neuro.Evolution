@@ -7,12 +7,10 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
     public class MapGeneratorService
     {
         /// <summary>
-        /// How many tiles a random map may reach from the origin, which is what keeps it inside the window.
+        /// How much of the available tiles a random map tries to use. Higher leaves the track little room to wind.
         /// </summary>
-        private const int RandomMapRadius = 3;
-
-        private const int MinimumRandomMapTileCount = 24;
-        private const int MaximumRandomMapTileCount = 36;
+        private const double MinimumRandomMapCoverage = 0.5;
+        private const double MaximumRandomMapCoverage = 0.7;
 
         private readonly Random _random;
 
@@ -20,70 +18,6 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
             Random random)
         {
             _random = random;
-        }
-
-        public Map PickRandomPredefinedMap()
-        {
-            var maps = new List<Map>();
-
-            //maps.Add(CreateMapBuilder()
-            //    .MoveInDirection(Direction.Top)
-            //    .MoveInDirection(Direction.Top)
-            //    .MoveInDirection(Direction.Top)
-            //    .MoveInDirection(Direction.Right)
-            //    .MoveInDirection(Direction.Right)
-            //    .MoveInDirection(Direction.Right)
-            //    .MoveInDirection(Direction.Right)
-            //    .MoveInDirection(Direction.Bottom)
-            //    .MoveInDirection(Direction.Bottom)
-            //    .MoveInDirection(Direction.Bottom)
-            //    .MoveInDirection(Direction.Bottom)
-            //    .MoveInDirection(Direction.Left)
-            //    .MoveInDirection(Direction.Left)
-            //    .MoveInDirection(Direction.Left)
-            //    .MoveInDirection(Direction.Left)
-            //    .MoveInDirection(Direction.Top)
-            //    .Build());
-
-            maps.Add(CreateMapBuilder()
-                .MoveInDirection(Direction.Top)
-                .MoveInDirection(Direction.Top)
-                .MoveInDirection(Direction.Top)
-                .MoveInDirection(Direction.Right)
-                //.MoveInDirection(Direction.Right)
-                //.MoveInDirection(Direction.Right)
-                //.MoveInDirection(Direction.Top)
-                //.MoveInDirection(Direction.Left)
-                .MoveInDirection(Direction.Top)
-                .MoveInDirection(Direction.Right)
-                .MoveInDirection(Direction.Top)
-                .MoveInDirection(Direction.Left)
-                .MoveInDirection(Direction.Left)
-                .MoveInDirection(Direction.Left)
-                .MoveInDirection(Direction.Bottom)
-                .MoveInDirection(Direction.Left)
-                .MoveInDirection(Direction.Left)
-                .MoveInDirection(Direction.Bottom)
-                .MoveInDirection(Direction.Right)
-                .MoveInDirection(Direction.Bottom)
-                .MoveInDirection(Direction.Right)
-                .MoveInDirection(Direction.Bottom)
-                .MoveInDirection(Direction.Left)
-                .MoveInDirection(Direction.Left)
-                .MoveInDirection(Direction.Top)
-                .MoveInDirection(Direction.Left)
-                .MoveInDirection(Direction.Bottom)
-                .MoveInDirection(Direction.Bottom)
-                .MoveInDirection(Direction.Right)
-                .MoveInDirection(Direction.Right)
-                .MoveInDirection(Direction.Right)
-                .MoveInDirection(Direction.Bottom)
-                .MoveInDirection(Direction.Right)
-                .MoveInDirection(Direction.Top)
-                .Build());
-
-            var index = _random.Next(0, maps.Count);
-            return maps[index];
         }
 
         private static MapBuilder CreateMapBuilder()
@@ -95,9 +29,13 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
         /// Grows a small rectangular loop by repeatedly pushing one of its edges outwards into free tiles.
         /// Every step keeps the track a closed loop that never touches itself, so no retrying is needed.
         /// The edges around the origin are left alone, since cars start there driving towards the top.
+        /// The map is centered around the origin and never gets wider or taller than the given amount of tiles.
         /// </summary>
-        public Map GenerateRandomMap()
+        public Map GenerateRandomMap(int maximumColumns, int maximumRows)
         {
+            var radiusX = Math.Max(1, (maximumColumns - 1) / 2);
+            var radiusY = Math.Max(1, (maximumRows - 1) / 2);
+
             var side = _random.Next(2) == 0 ? -1 : 1;
             var tiles = new List<(int X, int Y)>
             {
@@ -108,9 +46,12 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
                 (side, 1),
                 (0, 1)
             };
+            var occupiedTiles = new HashSet<(int X, int Y)>(tiles);
 
-            var targetTileCount = _random.Next(MinimumRandomMapTileCount, MaximumRandomMapTileCount + 1);
-            while (tiles.Count < targetTileCount && TryGrowLoop(tiles))
+            var availableTileCount = ((radiusX * 2) + 1) * ((radiusY * 2) + 1);
+            var coverage = MinimumRandomMapCoverage + (_random.NextDouble() * (MaximumRandomMapCoverage - MinimumRandomMapCoverage));
+            var targetTileCount = (int)(availableTileCount * coverage);
+            while (tiles.Count < targetTileCount && TryGrowLoop(tiles, occupiedTiles, radiusX, radiusY))
             {
             }
 
@@ -121,8 +62,17 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
             return mapBuilder.Build();
         }
 
-        private bool TryGrowLoop(List<(int X, int Y)> tiles)
+        private bool TryGrowLoop(
+            List<(int X, int Y)> tiles,
+            HashSet<(int X, int Y)> occupiedTiles,
+            int radiusX,
+            int radiusY)
         {
+            bool IsFreeTile((int X, int Y) tile) =>
+                Math.Abs(tile.X) <= radiusX &&
+                Math.Abs(tile.Y) <= radiusY &&
+                !occupiedTiles.Contains(tile);
+
             var candidates = new List<(int InsertionIndex, (int X, int Y) First, (int X, int Y) Second)>();
             for (var i = 1; i < tiles.Count - 1; i++)
             {
@@ -138,7 +88,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
                     var first = (from.X + sidewaysX * sign, from.Y + sidewaysY * sign);
                     var second = (to.X + sidewaysX * sign, to.Y + sidewaysY * sign);
 
-                    if (IsFreeTile(tiles, first) && IsFreeTile(tiles, second))
+                    if (IsFreeTile(first) && IsFreeTile(second))
                         candidates.Add((i + 1, first, second));
                 }
             }
@@ -148,16 +98,10 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
 
             var candidate = candidates[_random.Next(candidates.Count)];
             tiles.InsertRange(candidate.InsertionIndex, new[] { candidate.First, candidate.Second });
+            occupiedTiles.Add(candidate.First);
+            occupiedTiles.Add(candidate.Second);
 
             return true;
-        }
-
-        private static bool IsFreeTile(List<(int X, int Y)> tiles, (int X, int Y) tile)
-        {
-            return
-                Math.Abs(tile.X) <= RandomMapRadius &&
-                Math.Abs(tile.Y) <= RandomMapRadius &&
-                !tiles.Contains(tile);
         }
 
         private static Direction GetDirectionBetween((int X, int Y) from, (int X, int Y) to)

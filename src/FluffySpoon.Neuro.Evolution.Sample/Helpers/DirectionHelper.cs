@@ -88,14 +88,10 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Helpers
 
         public static bool IsPointInDirectionOfSensorLine(Line sensorLine, Point intersectionPoint)
         {
-            var lineToIntersectionPoint = new Line()
-            {
-                Start = sensorLine.Start,
-                End = intersectionPoint
-            };
+            var sensorDirection = sensorLine.End - sensorLine.Start;
+            var intersectionDirection = intersectionPoint - sensorLine.Start;
 
-            var angle = sensorLine.GetAngleTo(lineToIntersectionPoint);
-            return angle < 90 || angle > 270;
+            return (sensorDirection.X * intersectionDirection.X) + (sensorDirection.Y * intersectionDirection.Y) > 0;
         }
 
         public static bool IsPointOutsideLineBoundaries(Line line, Point intersectionPoint)

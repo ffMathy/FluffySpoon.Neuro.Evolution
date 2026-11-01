@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace FluffySpoon.Neuro.Evolution.Sample.Models
 {
@@ -7,8 +7,8 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Models
     {
         public const int Size = 30;
 
-        public const float MinimumSpeed = 4;
-        public const float MaximumSpeed = 15;
+        public const float MinimumSpeed = 1;
+        public const float MaximumSpeed = 40;
         public const float MaximumTurnAngleVelocity = 5;
 
         public BoundingBox BoundingBox { get; }

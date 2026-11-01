@@ -39,10 +39,10 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Models
 
         public float GetDistanceTo(Point other)
         {
-            var a = Math.Abs(other.X - X);
-            var b = Math.Abs(other.Y - Y);
+            var a = other.X - X;
+            var b = other.Y - Y;
 
-            return (float)Math.Sqrt(Math.Pow(a, 2) + Math.Pow(b, 2));
+            return MathF.Sqrt((a * a) + (b * b));
         }
 
         public override string ToString()

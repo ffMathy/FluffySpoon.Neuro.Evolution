@@ -7,6 +7,7 @@ public interface IGeneration<TSimulation> where TSimulation : ISimulation
     IReadOnlyCollection<IGenome<TSimulation>> Genomes { get; }
 
     IGeneration<TSimulation> Evolve();
+    IGeneration<TSimulation> EvolveInParallel();
 
     void AddGenome(IGenome<TSimulation> genome);
     void RemoveGenome(IGenome<TSimulation> genome);

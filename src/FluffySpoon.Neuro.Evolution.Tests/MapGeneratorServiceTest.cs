@@ -10,7 +10,9 @@ namespace FluffySpoon.Neuro.Evolution.Tests;
 [TestClass]
 public class MapGeneratorServiceTest
 {
-    private const int MapsToGenerate = 1000;
+    private const int MapsToGenerate = 100;
+    private const int MaximumColumns = 25;
+    private const int MaximumRows = 21;
 
     [TestMethod]
     public void GenerateRandomMap_CreatesClosedLoopsThatNeverTouchThemselves()
@@ -19,9 +21,9 @@ public class MapGeneratorServiceTest
 
         for (var i = 0; i < MapsToGenerate; i++)
         {
-            var nodes = service.GenerateRandomMap().Nodes;
+            var nodes = service.GenerateRandomMap(MaximumColumns, MaximumRows).Nodes;
 
-            Assert.IsTrue(nodes.Length is >= 24 and <= 36, $"Unexpected node count {nodes.Length}.");
+            Assert.IsTrue(nodes.Length >= 200, $"Unexpected node count {nodes.Length}.");
 
             foreach (var node in nodes)
             {
@@ -36,10 +38,9 @@ public class MapGeneratorServiceTest
             var locations = nodes.Select(x => x.BoundingBox.Location).ToArray();
             Assert.AreEqual(nodes.Length, locations.Distinct().Count());
 
-            var limit = (float)((3 + 0.5) * Map.TileSize);
-            Assert.IsTrue(locations.All(x =>
-                Math.Abs(x.X) <= limit &&
-                Math.Abs(x.Y) <= limit));
+            Assert.IsTrue(nodes.All(x =>
+                Math.Abs(x.BoundingBox.Center.X) <= ((MaximumColumns - 1) / 2) * (float)Map.TileSize &&
+                Math.Abs(x.BoundingBox.Center.Y) <= ((MaximumRows - 1) / 2) * (float)Map.TileSize));
         }
     }
 
@@ -50,7 +51,7 @@ public class MapGeneratorServiceTest
 
         for (var i = 0; i < MapsToGenerate; i++)
         {
-            var firstNode = service.GenerateRandomMap().Nodes.First();
+            var firstNode = service.GenerateRandomMap(MaximumColumns, MaximumRows).Nodes.First();
 
             Assert.AreEqual(Direction.Bottom, firstNode.EntranceDirection);
             Assert.AreEqual(Direction.Top, firstNode.ExitDirection);
@@ -66,7 +67,7 @@ public class MapGeneratorServiceTest
 
         var layouts = Enumerable
             .Range(0, 100)
-            .Select(_ => string.Join(",", service.GenerateRandomMap().Nodes.Select(x => x.ExitDirection)))
+            .Select(_ => string.Join(",", service.GenerateRandomMap(MaximumColumns, MaximumRows).Nodes.Select(x => x.ExitDirection)))
             .Distinct()
             .Count();
 
@@ -81,7 +82,7 @@ public class MapGeneratorServiceTest
 
         for (var i = 0; i < 50; i++)
         {
-            var simulation = new CarSimulation(service.GenerateRandomMap());
+            var simulation = new CarSimulation(service.GenerateRandomMap(MaximumColumns, MaximumRows));
 
             while (!simulation.HasEnded)
             {

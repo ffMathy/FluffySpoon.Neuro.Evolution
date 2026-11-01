@@ -33,8 +33,6 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
     {
         private readonly Map _map;
 
-        private readonly IDictionary<int, List<ProgressLine>> _allProgressLinesByMapNodeOffset;
-
         /// <summary>
         /// How many ticks a car may go without reaching new progress before it is considered stuck.
         /// </summary>
@@ -43,12 +41,12 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
         /// <summary>
         /// The simulation ends once a car has driven this many laps.
         /// </summary>
-        private const int LapsToComplete = 2;
+        private const int LapsToComplete = 1;
 
         /// <summary>
         /// Sensor distances are divided by this value so that the network receives inputs roughly in the range [0, 1].
         /// </summary>
-        private const float SensorNormalizationDistance = (float)Map.TileSize * 3;
+        private const float SensorNormalizationDistance = (float)Map.TileSize * Map.SensorRangeInTiles;
 
         private readonly int _progressLineCount;
 
@@ -93,50 +91,43 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
 
             _map = map;
 
-            var allProgressLines = _map.Nodes
-                .SelectMany(x => x.ProgressLines)
-                .OrderBy(x => x.Offset)
-                .ToArray();
-            _allProgressLinesByMapNodeOffset = allProgressLines
-                .GroupBy(x => x
-                    .MapNode
-                    .Offset)
-                .ToDictionary(
-                    x => x.Key,
-                    x => x.ToList());
-
-            _progressLineCount = allProgressLines.Last().Offset;
+            _progressLineCount = _map.ProgressLineCount;
 
             HasEnded = false;
             TicksSurvived = 0;
             _laps = 0;
 
-            CurrentProgressLine = allProgressLines.First();
+            CurrentProgressLine = _map.FirstProgressLine;
         }
 
         private ProgressLine GetClosestIntersectionPointProgressLine()
         {
-            var before = _allProgressLinesByMapNodeOffset[CurrentMapNode.Previous.Offset];
-            var current = _allProgressLinesByMapNodeOffset[CurrentMapNode.Offset];
-            var after = _allProgressLinesByMapNodeOffset[CurrentMapNode.Next.Offset];
+            var center = Car.BoundingBox.Center;
+            var closest = CurrentProgressLine;
+            var closestDistance = float.MaxValue;
 
-            var lines = before.Union(current).Union(after);
+            foreach (var node in new[] { CurrentMapNode.Previous, CurrentMapNode, CurrentMapNode.Next })
+            {
+                foreach (var progressLine in node.ProgressLines)
+                {
+                    var distance = DistanceHelper
+                        .FindClosestPointOnLine(center, progressLine.Line)
+                        .GetDistanceTo(center);
 
-            return lines
-                .OrderBy(progressLine => DistanceHelper
-                    .FindClosestPointOnLine(
-                        Car.BoundingBox.Center,
-                        progressLine.Line)
-                    .GetDistanceTo(Car.BoundingBox.Center))
-                .First();
+                    if (distance < closestDistance)
+                    {
+                        closest = progressLine;
+                        closestDistance = distance;
+                    }
+                }
+            }
+
+            return closest;
         }
 
         private CarSensorReadingSnapshot GetSensorReadings()
         {
-            var mapLines = _map.Nodes
-                .SelectMany(x => x.WallLines)
-                .Select(x => x.Line)
-                .ToArray();
+            var mapLines = _map.GetWallLinesInSensorRange(Car.BoundingBox.Center);
             var sensorReadingCached = new CarSensorReadingSnapshot()
             {
                 LeftSensor = GetSensorReading(mapLines, -360f / 16f),
@@ -150,7 +141,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
         }
 
         private CarSensorReading GetSensorReading(
-            IEnumerable<Line> lines,
+            Line[] lines,
             float angleInDegrees)
         {
             var forwardDirectionLine = new Line()
@@ -160,7 +151,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
             };
             var sensorLine = forwardDirectionLine.Rotate(angleInDegrees);
 
-            var carSensorReadings = new HashSet<CarSensorReading>();
+            CarSensorReading? closestReading = null;
             foreach (var line in lines)
             {
                 var intersectionPointNullable = sensorLine.GetIntersectionPointWith(line);
@@ -175,16 +166,19 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
                     continue;
 
                 var distance = Car.BoundingBox.Center.GetDistanceTo(intersectionPoint);
-                carSensorReadings.Add(new CarSensorReading()
+                if (closestReading == null || distance < closestReading.Value.Distance)
                 {
-                    IntersectionPoint = intersectionPoint,
-                    Distance = distance
-                });
+                    closestReading = new CarSensorReading()
+                    {
+                        IntersectionPoint = intersectionPoint,
+                        Distance = distance
+                    };
+                }
             }
 
-            if (carSensorReadings.Count == 0)
+            if (closestReading == null)
             {
-                // The ray escaped through a gap in the walls (e.g. a corner). Treat it as "nothing in sight".
+                // The ray escaped through a gap in the walls (e.g. a corner) or found nothing within range. Treat it as "nothing in sight".
                 var direction = sensorLine.End - sensorLine.Start;
                 var length = direction.GetDistanceTo(new Point(0, 0));
                 return new CarSensorReading()
@@ -198,7 +192,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
                 };
             }
 
-            return carSensorReadings.MinBy(x => x.Distance);
+            return closestReading.Value;
         }
 
         private static float NormalizeBinaryPrediction(float prediction)
@@ -300,10 +294,6 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
                 delta -= _progressLineCount;
             else if (delta < -_progressLineCount / 2)
                 delta += _progressLineCount;
-
-            // Ignore jumps; a car can only move a couple of progress lines per tick.
-            if (Math.Abs(delta) >= 3)
-                return;
 
             if (delta > 0 && newProgressLine.Offset < previousProgressLine.Offset)
                 _laps++;

@@ -42,6 +42,25 @@ public class ConvergenceTest
         Assert.AreEqual(0, best.Simulation.Errors, $"Error sum was {best.Simulation.Fitness}");
     }
 
+    [TestMethod]
+    public void EvolveInParallel_LearnsXor()
+    {
+        var (generation, settings) = CreateGeneration();
+
+        IGeneration<XorSimulation> current = generation;
+        for (var i = 0; i < 300; i++)
+        {
+            current = current.EvolveInParallel();
+            Assert.AreEqual(settings.AmountOfGenomesInPopulation, current.Genomes.Count);
+        }
+
+        var best = current.Genomes.First().Clone();
+        while (!best.Simulation.HasEnded)
+            best.Tick();
+
+        Assert.AreEqual(0, best.Simulation.Errors, $"Error sum was {best.Simulation.Fitness}");
+    }
+
     private static (Generation<XorSimulation>, EvolutionSettings<XorSimulation>) CreateGeneration()
     {
         var settings = new EvolutionSettings<XorSimulation>

@@ -1,34 +1,37 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Shapes;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
-using Avalonia.Media;
 using Avalonia.Threading;
 using FluffySpoon.Neuro.Evolution.Domain.Genomics;
 using FluffySpoon.Neuro.Evolution.Infrastructure.Settings;
 using FluffySpoon.Neuro.Evolution.Sample.Models;
 using FluffySpoon.Neuro.Evolution.Sample.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Line = Avalonia.Controls.Shapes.Line;
-using Point = FluffySpoon.Neuro.Evolution.Sample.Models.Point;
 
 namespace FluffySpoon.Neuro.Evolution.Sample.Views;
 
 public partial class MainWindow : Window
 {
+    /// <summary>
+    /// A slow car can take minutes to finish a large map, which would hold up the training if it was shown tick by tick.
+    /// </summary>
+    private static readonly TimeSpan MaximumTimeToWatchRun = TimeSpan.FromSeconds(15);
+
+    private readonly Stopwatch _drawnRunStopwatch = new();
+
     private readonly Random _random;
     private readonly MapGeneratorService _mapGeneratorService;
+    private readonly FpsCounter _fpsCounter = new();
+    private readonly GenerationsPerBatchController _generationsPerBatchController = new();
 
     private bool _keepRunning;
-    private bool _render;
     private bool _isTraining;
     private bool _isGenerationsTextValid;
     private int _generationsPerBatch = 1;
-    private int _mapElementCount;
 
     private Map? _map;
     private IGeneration<CarSimulation> _currentGeneration;
@@ -38,10 +41,14 @@ public partial class MainWindow : Window
         _random = new Random();
         _mapGeneratorService = new MapGeneratorService(_random);
 
-        _render = true;
-
         InitializeComponent();
-        SetMap(_mapGeneratorService.PickRandomPredefinedMap());
+
+        // A map has to fit the window, and the size of the window is not known until it has opened.
+        Opened += (_, _) => Dispatcher.UIThread.Post(GenerateNewMap, DispatcherPriority.Background);
+
+        this
+            .GetObservable(WindowStateProperty)
+            .Subscribe(KeepWindowMaximized);
 
         GenerationsTextBox
             .GetObservable(TextBox.TextProperty)
@@ -63,31 +70,41 @@ public partial class MainWindow : Window
 
         var serviceProvider = serviceCollection.BuildServiceProvider();
         _currentGeneration = serviceProvider.GetRequiredService<IGeneration<CarSimulation>>();
+
+        SimulationView.FrameDrawn += _fpsCounter.AddFrame;
+        DispatcherTimer.Run(() =>
+        {
+            FpsText.Text = $"FPS: {_fpsCounter.ReadFramesPerSecond():0}";            return true;
+        }, TimeSpan.FromSeconds(1));
     }
 
     /// <summary>
-    /// Called on the training thread after every tick. Blocking until the UI thread has drawn the tick
-    /// means the simulations can't change while they are being read, and that ticks can't pile up
-    /// faster than they can be drawn. The low priority lets input and rendering go first.
+    /// Minimizing is still allowed, since it only hides the window.
+    /// </summary>
+    private void KeepWindowMaximized(WindowState state)
+    {
+        if (state == WindowState.Normal)
+            Dispatcher.UIThread.Post(() => WindowState = WindowState.Maximized);
+    }
+
+    /// <summary>
+    /// Called on the training thread after every tick of a generation that is drawn.
     /// </summary>
     private void RenderGenomes(Genomes<CarSimulation> genomes)
     {
-        if (!_render)
+        var isFastForwarding = _drawnRunStopwatch.Elapsed > MaximumTimeToWatchRun;
+        if (isFastForwarding && !SimulationView.IsFrameDue)
             return;
 
-        Dispatcher.UIThread
-            .InvokeAsync(() =>
-            {
-                ClearCars();
+        var cars = genomes.All
+            .Select(genome => new CarDrawing(genome.Simulation, false))
+            .Concat(genomes.Best.Select(genome => new CarDrawing(genome.Simulation, true)))
+            .ToArray();
 
-                foreach (var genome in genomes.All)
-                    RenderCarSimulation(genome.Simulation, false);
-
-                foreach (var genome in genomes.Best)
-                    RenderCarSimulation(genome.Simulation, true);
-            }, DispatcherPriority.Background)
-            .GetAwaiter()
-            .GetResult();
+        if (isFastForwarding)
+            SimulationView.DrawCarsWithoutWaiting(cars);
+        else
+            SimulationView.DrawCars(cars);
     }
 
     private void GenerateNewMapButton_Click(object sender, RoutedEventArgs e)
@@ -97,7 +114,8 @@ public partial class MainWindow : Window
 
     private void GenerateNewMap()
     {
-        SetMap(_mapGeneratorService.GenerateRandomMap());
+        var (columns, rows) = SimulationView.MaximumMapSize;
+        SetMap(_mapGeneratorService.GenerateRandomMap(columns, rows));
 
         // The next generation's simulations were already created on the previous map.
         // Cloning gives them new simulations on this map, while keeping what their networks have learned.
@@ -115,6 +133,7 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Trains on a background thread so that the UI stays responsive, drawing only the last generation of each batch.
+    /// The other generations aren't slowed down by drawing, and are the ones that decide how many generations the next batch has.
     /// The buttons are disabled meanwhile, since only one training run can evolve the current generation,
     /// and since a new map would otherwise be picked up halfway through creating the next generation.
     /// The settings are read before each batch, so they can be changed while it keeps running.
@@ -132,14 +151,9 @@ public partial class MainWindow : Window
                     GenerateNewMap();
 
                 var generationsPerBatch = _generationsPerBatch;
-                await Task.Run(() =>
-                {
-                    for (var i = 0; i < generationsPerBatch; i++)
-                    {
-                        _render = i == generationsPerBatch - 1;
-                        _currentGeneration = _currentGeneration.Evolve();
-                    }
-                });
+                await Task.Run(() => TrainBatch(generationsPerBatch));
+
+                UpdateGenerationsPerBatch();
             } while (_keepRunning);
         }
         finally
@@ -147,6 +161,35 @@ public partial class MainWindow : Window
             _isTraining = false;
             UpdateButtons();
         }
+    }
+
+    private void TrainBatch(int generationsPerBatch)
+    {
+        for (var i = 0; i < generationsPerBatch - 1; i++)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            _currentGeneration = _currentGeneration.EvolveInParallel();
+            _generationsPerBatchController.AddRun(stopwatch.Elapsed);
+        }
+
+        _drawnRunStopwatch.Restart();
+        _currentGeneration = _currentGeneration.Evolve();
+
+        // Drawing makes this run far slower than the others, so it only counts when there is nothing better.
+        if (_generationsPerBatchController.AverageRunTime == null)
+            _generationsPerBatchController.AddRun(_drawnRunStopwatch.Elapsed);
+    }
+
+    private void UpdateGenerationsPerBatch()
+    {
+        var averageRunTime = _generationsPerBatchController.AverageRunTime;
+        if (averageRunTime == null)
+            return;
+
+        AverageRunTimeText.Text = $"Average run time on this map: {averageRunTime.Value.TotalSeconds:0.000} s";
+        GenerationsTextBox.Text = _generationsPerBatchController
+            .GetNextGenerationsPerBatch(_generationsPerBatch)
+            .ToString();
     }
 
     /// <summary>
@@ -170,176 +213,8 @@ public partial class MainWindow : Window
     private void SetMap(Map map)
     {
         _map = map;
-
-        MapCanvas.Children.Clear();
-        RenderMap();
-        _mapElementCount = MapCanvas.Children.Count;
-    }
-
-    private void ClearCars()
-    {
-        MapCanvas.Children.RemoveRange(_mapElementCount, MapCanvas.Children.Count - _mapElementCount);
-    }
-
-    private void RenderMap()
-    {
-        if (_map == null)
-        {
-            throw new InvalidOperationException("No map has been generated yet.");
-        }
-        
-        foreach (var node in _map.Nodes)
-        {
-            RenderMapNode(node);
-        }
-    }
-
-    private void Render(IControl element)
-    {
-        MapCanvas.Children.Add(element);
-    }
-
-    private void RenderCarSimulation(CarSimulation carSimulation, bool isBest)
-    {
-        var car = carSimulation.Car;
-
-        var color = Brushes.Green;
-        if (carSimulation.HasEnded)
-        {
-            color = Brushes.Red;
-        }
-
-        if (isBest)
-        {
-            color = Brushes.Blue;
-        }
-
-        var ellipse = new Ellipse()
-        {
-            Width = car.BoundingBox.Size.Width,
-            Height = car.BoundingBox.Size.Height,
-            Fill = Brushes.Transparent,
-            Stroke = color,
-            StrokeThickness = 3,
-            Opacity = 1
-        };
-        Render(ellipse);
-
-        Canvas.SetLeft(ellipse, car.BoundingBox.Location.X);
-        Canvas.SetTop(ellipse, car.BoundingBox.Location.Y);
-
-        if (carSimulation.HasEnded)
-            return;
-
-        var line = new Line()
-        {
-            StartPoint = new Avalonia.Point(
-                car.BoundingBox.Center.X,
-                car.BoundingBox.Center.Y),
-            EndPoint = new Avalonia.Point(
-                car.BoundingBox.Center.X + (car.ForwardDirectionLine.End.X * (double)car.BoundingBox.Size.Width),
-                car.BoundingBox.Center.Y + (car.ForwardDirectionLine.End.Y * (double)car.BoundingBox.Size.Height)),
-            Stroke = Brushes.Blue,
-            StrokeDashOffset = 2,
-            StrokeThickness = 2
-        };
-        Render(line);
-
-        RenderCarSimulationSensorReadings(carSimulation);
-    }
-
-    private void RenderCarSimulationSensorReadings(CarSimulation carSimulation)
-    {
-        if (carSimulation.HasEnded)
-            return;
-
-        var sensorReadings = carSimulation.SensorReadings;
-        var sensorReadingsArray = new[]
-        {
-            sensorReadings.LeftSensor,
-            sensorReadings.LeftCenterSensor,
-            sensorReadings.CenterSensor,
-            sensorReadings.RightCenterSensor,
-            sensorReadings.RightSensor
-        };
-
-        var car = carSimulation.Car;
-        foreach (var sensorReading in sensorReadingsArray)
-        {
-            var sensorLine = new Line()
-            {
-                StartPoint = new Avalonia.Point(
-                    car.BoundingBox.Center.X,
-                    car.BoundingBox.Center.Y),
-                EndPoint = new Avalonia.Point(
-                    sensorReading.IntersectionPoint.X,
-                    sensorReading.IntersectionPoint.Y),
-                Stroke = Brushes.Blue,
-                Opacity = 0.2,
-                StrokeThickness = 1
-            };
-
-            Render(sensorLine);
-        }
-    }
-
-    private void RenderMapNode(MapNode node)
-    {
-        var rectangle = new Rectangle()
-        {
-            Width = node.BoundingBox.Size.Width,
-            Height = node.BoundingBox.Size.Height,
-            Fill = Brushes.White,
-            Opacity = 1
-        };
-        MapCanvas.Children.Add(rectangle);
-
-        Canvas.SetLeft(rectangle, node.BoundingBox.Location.X);
-        Canvas.SetTop(rectangle, node.BoundingBox.Location.Y);
-
-        foreach (var progressLine in node.ProgressLines)
-            RenderLine(progressLine.Line, Brushes.LightGray, 0.25, progressLine.Offset.ToString());
-
-        foreach (var wallLine in node.WallLines)
-            RenderLine(wallLine.Line, Brushes.DimGray, 1, null);
-    }
-
-    private void RenderLine(Models.Line line, IBrush brush, double opacity, string? annotation)
-    {
-        MapCanvas.Children.Add(new Line()
-        {
-            StartPoint = new Avalonia.Point(
-                line.Start.X,
-                line.Start.Y),
-            EndPoint = new Avalonia.Point(
-                line.End.X,
-                line.End.Y),
-            Opacity = opacity,
-            Stroke = brush,
-            StrokeThickness = 2
-        });
-
-        if (annotation != null)
-        {
-            RenderTextBlock(line.Center, opacity, annotation);
-        }
-    }
-
-    private void RenderTextBlock(Point point, double opacity, string annotation)
-    {
-        var label = new TextBlock()
-        {
-            Text = annotation,
-            FontSize = 10,
-            Opacity = opacity,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-
-        Canvas.SetLeft(label, point.X);
-        Canvas.SetTop(label, point.Y);
-
-        MapCanvas.Children.Add(label);
+        _generationsPerBatchController.ForgetRuns();
+        SimulationView.SetMap(map);
     }
 
     private void KeepRunningCheckbox_Checked(object sender, RoutedEventArgs e)

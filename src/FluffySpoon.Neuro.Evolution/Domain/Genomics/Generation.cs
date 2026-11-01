@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using FluffySpoon.Neuro.Evolution.Infrastructure.Settings;
 
 namespace FluffySpoon.Neuro.Evolution.Domain.Genomics;
@@ -94,6 +95,29 @@ public class Generation<TSimulation> : IGeneration<TSimulation> where TSimulatio
         // ReSharper disable once EmptyEmbeddedStatement
         while (Tick() == SimulationResult.InProgress) ;
 
+        return CreateNextGeneration();
+    }
+
+    /// <summary>
+    /// Same as <see cref="Evolve"/>, but runs each simulation to completion on its own thread pool thread
+    /// and without calling <see cref="IEvolutionSettings{TSimulation}.PostTickMethod"/>, since no shared tick exists.
+    /// Simulations must not share any state that changes while they run.
+    /// </summary>
+    public IGeneration<TSimulation> EvolveInParallel()
+    {
+        InitializeIfNeeded();
+
+        Parallel.ForEach(_genomes, genome =>
+        {
+            while (!genome.Simulation.HasEnded)
+                genome.Tick();
+        });
+
+        return CreateNextGeneration();
+    }
+
+    private IGeneration<TSimulation> CreateNextGeneration()
+    {
         var survivors = GetGenomesOrderedByFitness()
             .Take(AmountOfGenomesToKeep)
             .ToList();

@@ -65,6 +65,8 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
                     nodeProgressLine.MapNode = currentNode;
                 }
 
+                currentNode.ProgressLines = nodeProgressLines;
+
                 foreach(var wallLine in currentNode.WallLines)
                 {
                     wallLine.MapNode = currentNode;
@@ -77,10 +79,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
                 currentNode = nextNode;
             }
 
-            return new Map()
-            {
-                Nodes = _nodes.ToArray()
-            };
+            return new Map(_nodes.ToArray());
         }
 
         private static MapNode GenerateMapSegmentNode(
