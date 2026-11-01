@@ -5,6 +5,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using FluffySpoon.Neuro.Evolution.Domain.Genomics;
 using FluffySpoon.Neuro.Evolution.Infrastructure.Settings;
 using FluffySpoon.Neuro.Evolution.Sample.Helpers;
@@ -23,6 +24,7 @@ public partial class MainWindow : Window
 
     private bool _keepRunning;
     private bool _render;
+    private int _mapElementCount;
 
     private Map? _map;
     private IGeneration<CarSimulation> _currentGeneration;
@@ -55,40 +57,80 @@ public partial class MainWindow : Window
         _currentGeneration = serviceProvider.GetRequiredService<IGeneration<CarSimulation>>();
     }
 
+    /// <summary>
+    /// Called on the training thread after every tick. Blocking until the UI thread has drawn the tick
+    /// means the simulations can't change while they are being read, and that ticks can't pile up
+    /// faster than they can be drawn. The low priority lets input and rendering go first.
+    /// </summary>
     private void RenderGenomes(Genomes<CarSimulation> genomes)
     {
         if (!_render)
             return;
 
-        ClearCanvas();
+        Dispatcher.UIThread
+            .InvokeAsync(() =>
+            {
+                ClearCars();
 
-        foreach (var genome in genomes.All)
-            RenderCarSimulation(genome.Simulation, false);
+                foreach (var genome in genomes.All)
+                    RenderCarSimulation(genome.Simulation, false);
 
-        foreach (var genome in genomes.Best)
-            RenderCarSimulation(genome.Simulation, true);
+                foreach (var genome in genomes.Best)
+                    RenderCarSimulation(genome.Simulation, true);
+            }, DispatcherPriority.Background)
+            .GetAwaiter()
+            .GetResult();
     }
 
     private void GenerateNewMapButton_Click(object sender, RoutedEventArgs e)
     {
         GenerateNewMap();
-        ClearCanvas();
     }
 
-    private void TrainGenerationButton_Click(object sender, RoutedEventArgs e)
+    private async void TrainGenerationButton_Click(object sender, RoutedEventArgs e)
     {
-        RunGeneration();
+        await TrainAsync(1);
     }
 
-    private async void RunGeneration()
+    private async void TrainMultipleGenerationsButton_Click(object sender, RoutedEventArgs e)
     {
-        _render = true;
+        await TrainAsync(10);
+    }
 
-        do
+    /// <summary>
+    /// Trains on a background thread so that the UI stays responsive, drawing only the last generation of each batch.
+    /// The buttons are disabled meanwhile, since only one training run can evolve the current generation,
+    /// and since a new map would otherwise be picked up halfway through creating the next generation.
+    /// </summary>
+    private async Task TrainAsync(int generationsPerBatch)
+    {
+        SetButtonsEnabled(false);
+
+        try
         {
-            _currentGeneration = _currentGeneration.Evolve();
-            await Task.Delay(0);
-        } while (_keepRunning);
+            do
+            {
+                await Task.Run(() =>
+                {
+                    for (var i = 0; i < generationsPerBatch; i++)
+                    {
+                        _render = i == generationsPerBatch - 1;
+                        _currentGeneration = _currentGeneration.Evolve();
+                    }
+                });
+            } while (_keepRunning);
+        }
+        finally
+        {
+            SetButtonsEnabled(true);
+        }
+    }
+
+    private void SetButtonsEnabled(bool isEnabled)
+    {
+        TrainGenerationButton.IsEnabled = isEnabled;
+        TrainMultipleGenerationsButton.IsEnabled = isEnabled;
+        GenerateNewMapButton.IsEnabled = isEnabled;
     }
 
     private void GenerateNewMap()
@@ -98,13 +140,14 @@ public partial class MainWindow : Window
             _directionHelper);
         _map = mapGeneratorService.PickRandomPredefinedMap();
 
-        RenderMap();
-    }
-
-    private void ClearCanvas()
-    {
         MapCanvas.Children.Clear();
         RenderMap();
+        _mapElementCount = MapCanvas.Children.Count;
+    }
+
+    private void ClearCars()
+    {
+        MapCanvas.Children.RemoveRange(_mapElementCount, MapCanvas.Children.Count - _mapElementCount);
     }
 
     private void RenderMap()
@@ -266,21 +309,6 @@ public partial class MainWindow : Window
         Canvas.SetTop(label, point.Y);
 
         MapCanvas.Children.Add(label);
-    }
-
-    private async void TrainMultipleGenerationsButton_Click(object sender, RoutedEventArgs e)
-    {
-        do
-        {
-            const int generationsToRun = 10;
-            for (var i = 0; i < generationsToRun; i++)
-            {
-                _render = i == generationsToRun - 1;
-                _currentGeneration = _currentGeneration.Evolve();
-            }
-
-            await Task.Delay(100);
-        } while (_keepRunning);
     }
 
     private void KeepRunningCheckbox_Checked(object sender, RoutedEventArgs e)
