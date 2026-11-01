@@ -61,6 +61,19 @@ public class ConvergenceTest
         Assert.AreEqual(0, best.Simulation.Errors, $"Error sum was {best.Simulation.Fitness}");
     }
 
+    [TestMethod]
+    public void Clone_RunsIndependentlyOfOriginal()
+    {
+        var (generation, settings) = CreateGeneration();
+
+        var clone = generation.Clone();
+        clone.Simulate();
+
+        Assert.AreEqual(settings.AmountOfGenomesInPopulation, clone.Genomes.Count);
+        Assert.IsTrue(clone.Genomes.All(x => x.Simulation.HasEnded));
+        Assert.IsFalse(generation.Genomes.Any(x => x.Simulation.HasEnded));
+    }
+
     private static (Generation<XorSimulation>, EvolutionSettings<XorSimulation>) CreateGeneration()
     {
         var settings = new EvolutionSettings<XorSimulation>

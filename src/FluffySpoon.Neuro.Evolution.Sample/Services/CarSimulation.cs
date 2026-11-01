@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -44,6 +44,12 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
         private const int LapsToComplete = 1;
 
         /// <summary>
+        /// How much progress per tick counts compared to progress. A car at top speed makes roughly one progress line per tick.
+        /// Much higher than this, and crashing quickly into the first corner beats learning to get around it.
+        /// </summary>
+        private const double ProgressPerTickWeight = 0.5;
+
+        /// <summary>
         /// Sensor distances are divided by this value so that the network receives inputs roughly in the range [0, 1].
         /// </summary>
         private const float SensorNormalizationDistance = (float)Map.TileSize * Map.SensorRangeInTiles;
@@ -75,14 +81,22 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
         public int Progress => (_laps * _progressLineCount) + (CurrentProgressLine.Offset - 1);
 
         /// <summary>
-        /// Lower is better. Cars are ranked by how far they got along the track.
-        /// Once a car completes all laps, the time it took becomes a tie-breaker so that faster cars win.
-        /// Speed is deliberately not rewarded before that, since it would push the population towards
-        /// driving fast and crashing in tight corners instead of learning to brake.
+        /// Lower is better.
         /// </summary>
-        public double Fitness => _laps >= LapsToComplete
-            ? (-Progress * 100d) + (TicksSurvived / 100d)
-            : -Progress * 100d;
+        public double Fitness => CalculateFitness(Progress, TicksSurvived);
+
+        /// <summary>
+        /// Cars are ranked by how far they got along the track, multiplied by how fast they got there.
+        /// Multiplying means that speed can't make up for not getting anywhere, and that going backwards is never rewarded.
+        /// </summary>
+        public static double CalculateFitness(int progress, long ticks)
+        {
+            if (progress <= 0)
+                return -progress;
+
+            var progressPerTick = ticks == 0 ? 0 : progress / (double)ticks;
+            return -progress * (1 + (progressPerTick * ProgressPerTickWeight));
+        }
 
         public CarSimulation(
             Map map)

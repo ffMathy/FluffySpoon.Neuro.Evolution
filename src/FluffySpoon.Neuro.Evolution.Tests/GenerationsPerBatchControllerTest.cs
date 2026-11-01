@@ -7,6 +7,8 @@ namespace FluffySpoon.Neuro.Evolution.Tests;
 [TestClass]
 public class GenerationsPerBatchControllerTest
 {
+    private static readonly TimeSpan Target = TimeSpan.FromSeconds(10);
+
     /// <summary>
     /// Runs batches where every run takes the given time, and returns the amount of generations it ends up at.
     /// </summary>
@@ -15,7 +17,7 @@ public class GenerationsPerBatchControllerTest
         for (var i = 0; i < batches; i++)
         {
             controller.AddRun(runTime);
-            generations = controller.GetNextGenerationsPerBatch(generations);
+            generations = controller.GetNextGenerationsPerBatch(generations, Target);
         }
 
         return generations;
@@ -23,14 +25,14 @@ public class GenerationsPerBatchControllerTest
 
     private static void AssertTrainsForAboutTenSeconds(int generations, TimeSpan runTime)
     {
-        var trainingTime = runTime.TotalSeconds * (generations - 1);
+        var trainingTime = runTime.TotalSeconds * generations;
         Assert.IsTrue(trainingTime is > 9 and < 11, $"{generations} generations train for {trainingTime} seconds.");
     }
 
     [TestMethod]
     public void GetNextGenerationsPerBatch_KeepsAmountWithoutRuns()
     {
-        Assert.AreEqual(5, new GenerationsPerBatchController().GetNextGenerationsPerBatch(5));
+        Assert.AreEqual(5, new GenerationsPerBatchController().GetNextGenerationsPerBatch(5, Target));
     }
 
     [TestMethod]
@@ -92,9 +94,25 @@ public class GenerationsPerBatchControllerTest
 
         // A hundred generations of 0.1 seconds is right on target, so nothing should change much.
         controller.AddRun(TimeSpan.FromSeconds(0.1));
-        var generations = controller.GetNextGenerationsPerBatch(101);
+        var generations = controller.GetNextGenerationsPerBatch(100, Target);
 
         Assert.IsTrue(generations is > 90 and < 110, $"Jumped to {generations} generations.");
+    }
+
+    [TestMethod]
+    public void GetNextGenerationsPerBatch_FollowsTarget()
+    {
+        var controller = new GenerationsPerBatchController();
+        var runTime = TimeSpan.FromSeconds(0.1);
+
+        var generations = 1;
+        for (var i = 0; i < 25; i++)
+        {
+            controller.AddRun(runTime);
+            generations = controller.GetNextGenerationsPerBatch(generations, TimeSpan.FromSeconds(3));
+        }
+
+        Assert.IsTrue(generations is > 27 and < 33, $"Ended up at {generations} generations.");
     }
 
     [TestMethod]

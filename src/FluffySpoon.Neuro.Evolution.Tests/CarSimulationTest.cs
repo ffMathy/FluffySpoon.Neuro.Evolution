@@ -39,6 +39,31 @@ public class CarSimulationTest
         Assert.IsFalse(CreateLine(0, 0, 10, 0).IsCrossing(CreateLine(0, 1, 10, 1)));
     }
 
+    [TestMethod]
+    public void CalculateFitness_RewardsGettingThereFaster()
+    {
+        Assert.IsTrue(CarSimulation.CalculateFitness(100, 100) < CarSimulation.CalculateFitness(100, 1000));
+    }
+
+    [TestMethod]
+    public void CalculateFitness_RewardsGettingFurtherInTheSameTime()
+    {
+        Assert.IsTrue(CarSimulation.CalculateFitness(200, 1000) < CarSimulation.CalculateFitness(100, 1000));
+    }
+
+    [TestMethod]
+    public void CalculateFitness_PrefersFarOverFastWhenTheDifferenceIsLarge()
+    {
+        Assert.IsTrue(CarSimulation.CalculateFitness(200, 4000) < CarSimulation.CalculateFitness(20, 25));
+    }
+
+    [TestMethod]
+    public void CalculateFitness_NeverRewardsGoingBackwards()
+    {
+        Assert.AreEqual(0, CarSimulation.CalculateFitness(0, 100));
+        Assert.IsTrue(CarSimulation.CalculateFitness(-5, 5) > CarSimulation.CalculateFitness(0, 100));
+    }
+
     /// <summary>
     /// Accelerating as hard as possible while steering randomly is what gets cars into walls at top speed.
     /// </summary>

@@ -92,10 +92,35 @@ public class Generation<TSimulation> : IGeneration<TSimulation> where TSimulatio
     /// </summary>
     public IGeneration<TSimulation> Evolve()
     {
-        // ReSharper disable once EmptyEmbeddedStatement
-        while (Tick() == SimulationResult.InProgress) ;
+        Simulate();
 
         return CreateNextGeneration();
+    }
+
+    /// <summary>
+    /// Runs all simulations of this generation to completion, without breeding a next generation.
+    /// </summary>
+    public void Simulate()
+    {
+        // ReSharper disable once EmptyEmbeddedStatement
+        while (Tick() == SimulationResult.InProgress) ;
+    }
+
+    /// <summary>
+    /// A copy of this generation with copies of its genomes and fresh simulations, which can run independently of this one.
+    /// </summary>
+    public IGeneration<TSimulation> Clone()
+    {
+        InitializeIfNeeded();
+
+        var clone = new Generation<TSimulation>(
+            _evolutionSettings,
+            _genomeFactory);
+
+        foreach (var genome in _genomes)
+            clone.AddGenome(genome.Clone());
+
+        return clone;
     }
 
     /// <summary>
@@ -103,11 +128,13 @@ public class Generation<TSimulation> : IGeneration<TSimulation> where TSimulatio
     /// and without calling <see cref="IEvolutionSettings{TSimulation}.PostTickMethod"/>, since no shared tick exists.
     /// Simulations must not share any state that changes while they run.
     /// </summary>
-    public IGeneration<TSimulation> EvolveInParallel()
+    /// <param name="maximumDegreeOfParallelism">How many threads to use at most, or -1 for no limit.</param>
+    public IGeneration<TSimulation> EvolveInParallel(int maximumDegreeOfParallelism = -1)
     {
         InitializeIfNeeded();
 
-        Parallel.ForEach(_genomes, genome =>
+        var options = new ParallelOptions { MaxDegreeOfParallelism = maximumDegreeOfParallelism };
+        Parallel.ForEach(_genomes, options, genome =>
         {
             while (!genome.Simulation.HasEnded)
                 genome.Tick();

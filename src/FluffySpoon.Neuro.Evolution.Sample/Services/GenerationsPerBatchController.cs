@@ -6,13 +6,13 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
 {
     /// <summary>
     /// Uses a PID controller to pick how many generations to train at a time, so that a batch takes about
-    /// the same time on any map. Runs get longer as cars learn to survive, so only recent runs count.
+    /// as long as a given target. Runs get longer as cars learn to survive, so only recent runs count.
     /// Run times differ by orders of magnitude, so the controller works on logarithms. That makes
     /// being twice as slow as the target the same error no matter how many generations are involved.
     /// </summary>
     public class GenerationsPerBatchController
     {
-        public const int MinimumGenerationsPerBatch = 2;
+        public const int MinimumGenerationsPerBatch = 1;
         public const int MaximumGenerationsPerBatch = 10000;
 
         private const int RunsToAverage = 20;
@@ -21,12 +21,7 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
         private const double IntegralGain = 0.6;
         private const double DerivativeGain = 0.02;
 
-        /// <summary>
-        /// The last generation of a batch is the one that is drawn, which isn't part of the time being controlled.
-        /// </summary>
-        private const int DrawnGenerationsPerBatch = 1;
-
-        private static readonly TimeSpan TargetTrainingTimePerBatch = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan MinimumTargetTrainingTime = TimeSpan.FromSeconds(0.5);
         private static readonly TimeSpan MinimumRunTime = TimeSpan.FromMilliseconds(0.1);
 
         private readonly Queue<TimeSpan> _runTimes = new();
@@ -35,8 +30,8 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
             ProportionalGain,
             IntegralGain,
             DerivativeGain,
-            Math.Log(MinimumGenerationsPerBatch - DrawnGenerationsPerBatch),
-            Math.Log(MaximumGenerationsPerBatch - DrawnGenerationsPerBatch));
+            Math.Log(MinimumGenerationsPerBatch),
+            Math.Log(MaximumGenerationsPerBatch));
 
         private int? _lastGenerationsPerBatch;
 
@@ -62,27 +57,25 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
         }
 
         /// <summary>
-        /// Returns how many generations the next batch should have, given how many the current one has.
+        /// Returns how many generations the next batch should have to take the target time, given how many the current one has.
         /// A different amount than last returned means it was typed in, so the controller continues from there.
         /// </summary>
-        public int GetNextGenerationsPerBatch(int currentGenerationsPerBatch)
+        public int GetNextGenerationsPerBatch(int currentGenerationsPerBatch, TimeSpan targetTrainingTime)
         {
             var averageRunTime = AverageRunTime;
             if (averageRunTime == null)
                 return currentGenerationsPerBatch;
 
-            var trainedGenerations = Math.Max(1, currentGenerationsPerBatch - DrawnGenerationsPerBatch);
             if (currentGenerationsPerBatch != _lastGenerationsPerBatch)
-                _pidController.Reset(Math.Log(trainedGenerations));
+                _pidController.Reset(Math.Log(currentGenerationsPerBatch));
 
             var runTime = TimeSpan.FromTicks(Math.Max(averageRunTime.Value.Ticks, MinimumRunTime.Ticks));
-            var expectedTrainingTime = runTime * trainedGenerations;
-            var error = Math.Log(TargetTrainingTimePerBatch / expectedTrainingTime);
-
-            var nextTrainedGenerations = Math.Exp(_pidController.Update(error));
+            var expectedTrainingTime = runTime * currentGenerationsPerBatch;
+            var target = targetTrainingTime > MinimumTargetTrainingTime ? targetTrainingTime : MinimumTargetTrainingTime;
+            var error = Math.Log(target / expectedTrainingTime);
 
             _lastGenerationsPerBatch = (int)Math.Clamp(
-                Math.Round(nextTrainedGenerations) + DrawnGenerationsPerBatch,
+                Math.Round(Math.Exp(_pidController.Update(error))),
                 MinimumGenerationsPerBatch,
                 MaximumGenerationsPerBatch);
 

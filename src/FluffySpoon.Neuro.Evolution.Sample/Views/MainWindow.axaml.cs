@@ -17,9 +17,14 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Views;
 public partial class MainWindow : Window
 {
     /// <summary>
-    /// A slow car can take minutes to finish a large map, which would hold up the training if it was shown tick by tick.
+    /// A slow car can take minutes to finish a large map, which would hold up the next run if it was shown tick by tick.
     /// </summary>
     private static readonly TimeSpan MaximumTimeToWatchRun = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// Leaves room for drawing the current run and for the UI, so that training doesn't lower the frame rate.
+    /// </summary>
+    private static readonly int TrainingThreadCount = Math.Max(1, Environment.ProcessorCount - 2);
 
     private readonly Stopwatch _drawnRunStopwatch = new();
 
@@ -74,7 +79,8 @@ public partial class MainWindow : Window
         SimulationView.FrameDrawn += _fpsCounter.AddFrame;
         DispatcherTimer.Run(() =>
         {
-            FpsText.Text = $"FPS: {_fpsCounter.ReadFramesPerSecond():0}";            return true;
+            FpsText.Text = $"FPS: {_fpsCounter.ReadFramesPerSecond():0}";
+            return true;
         }, TimeSpan.FromSeconds(1));
     }
 
@@ -88,7 +94,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Called on the training thread after every tick of a generation that is drawn.
+    /// Called on the drawing thread after every tick of the run that is drawn.
     /// </summary>
     private void RenderGenomes(Genomes<CarSimulation> genomes)
     {
@@ -132,8 +138,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Trains on a background thread so that the UI stays responsive, drawing only the last generation of each batch.
-    /// The other generations aren't slowed down by drawing, and are the ones that decide how many generations the next batch has.
+    /// Draws a copy of the current generation while training what comes after it at the same time,
+    /// so that training isn't slowed down by drawing, and the next run is ready when the one being drawn has finished.
+    /// Both happen on background threads so that the UI stays responsive.
     /// The buttons are disabled meanwhile, since only one training run can evolve the current generation,
     /// and since a new map would otherwise be picked up halfway through creating the next generation.
     /// The settings are read before each batch, so they can be changed while it keeps running.
@@ -150,8 +157,12 @@ public partial class MainWindow : Window
                 if (GenerateNewMapEachTimeCheckbox.IsChecked == true)
                     GenerateNewMap();
 
+                var generationToDraw = _currentGeneration.Clone();
                 var generationsPerBatch = _generationsPerBatch;
-                await Task.Run(() => TrainBatch(generationsPerBatch));
+
+                var drawing = Task.Run(() => DrawRun(generationToDraw));
+                var training = Task.Run(() => TrainBatch(generationsPerBatch, drawing));
+                await Task.WhenAll(drawing, training);
 
                 UpdateGenerationsPerBatch();
             } while (_keepRunning);
@@ -163,21 +174,27 @@ public partial class MainWindow : Window
         }
     }
 
-    private void TrainBatch(int generationsPerBatch)
+    private void DrawRun(IGeneration<CarSimulation> generation)
     {
-        for (var i = 0; i < generationsPerBatch - 1; i++)
+        _drawnRunStopwatch.Restart();
+        generation.Simulate();
+        _drawnRunStopwatch.Stop();
+    }
+
+    /// <summary>
+    /// Stops early if the run being drawn has finished, since the next run shouldn't be kept waiting.
+    /// </summary>
+    private void TrainBatch(int generationsPerBatch, Task drawing)
+    {
+        for (var i = 0; i < generationsPerBatch; i++)
         {
             var stopwatch = Stopwatch.StartNew();
-            _currentGeneration = _currentGeneration.EvolveInParallel();
+            _currentGeneration = _currentGeneration.EvolveInParallel(TrainingThreadCount);
             _generationsPerBatchController.AddRun(stopwatch.Elapsed);
+
+            if (drawing.IsCompleted)
+                return;
         }
-
-        _drawnRunStopwatch.Restart();
-        _currentGeneration = _currentGeneration.Evolve();
-
-        // Drawing makes this run far slower than the others, so it only counts when there is nothing better.
-        if (_generationsPerBatchController.AverageRunTime == null)
-            _generationsPerBatchController.AddRun(_drawnRunStopwatch.Elapsed);
     }
 
     private void UpdateGenerationsPerBatch()
@@ -188,7 +205,7 @@ public partial class MainWindow : Window
 
         AverageRunTimeText.Text = $"Average run time on this map: {averageRunTime.Value.TotalSeconds:0.000} s";
         GenerationsTextBox.Text = _generationsPerBatchController
-            .GetNextGenerationsPerBatch(_generationsPerBatch)
+            .GetNextGenerationsPerBatch(_generationsPerBatch, _drawnRunStopwatch.Elapsed)
             .ToString();
     }
 
