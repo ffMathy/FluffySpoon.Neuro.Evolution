@@ -243,7 +243,15 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
             Car.Accelerate(deltaVelocity);
             Car.Turn(deltaAngle);
 
+            var previousCenter = Car.BoundingBox.Center;
+
             Car.Tick();
+
+            if (HasCrossedWall(previousCenter, Car.BoundingBox.Center))
+            {
+                HasEnded = true;
+                return;
+            }
 
             UpdateProgress();
 
@@ -281,6 +289,26 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Services
             {
                 HasEnded = true;
             }
+        }
+
+        /// <summary>
+        /// Checks the whole movement of a tick rather than where it ended, since a fast car can get past a wall in one tick.
+        /// </summary>
+        private bool HasCrossedWall(Point from, Point to)
+        {
+            var movement = new Line()
+            {
+                Start = from,
+                End = to
+            };
+
+            foreach (var wallLine in _map.GetWallLinesInSensorRange(from))
+            {
+                if (movement.IsCrossing(wallLine))
+                    return true;
+            }
+
+            return false;
         }
 
         private void UpdateProgress()

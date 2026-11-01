@@ -123,6 +123,41 @@ namespace FluffySpoon.Neuro.Evolution.Sample.Models
             }
         }
 
+        /// <summary>
+        /// Whether the two line segments touch or cross each other, unlike <see cref="GetIntersectionPointWith"/> which treats lines as endless.
+        /// </summary>
+        public bool IsCrossing(Line other)
+        {
+            var d1 = GetSide(other, Start);
+            var d2 = GetSide(other, End);
+            var d3 = GetSide(this, other.Start);
+            var d4 = GetSide(this, other.End);
+
+            if (d1 * d2 < 0 && d3 * d4 < 0)
+                return true;
+
+            return
+                (d1 == 0 && IsWithinBoundsOf(other, Start)) ||
+                (d2 == 0 && IsWithinBoundsOf(other, End)) ||
+                (d3 == 0 && IsWithinBoundsOf(this, other.Start)) ||
+                (d4 == 0 && IsWithinBoundsOf(this, other.End));
+        }
+
+        private static float GetSide(Line line, Point point)
+        {
+            return ((line.End.X - line.Start.X) * (point.Y - line.Start.Y)) -
+                   ((line.End.Y - line.Start.Y) * (point.X - line.Start.X));
+        }
+
+        private static bool IsWithinBoundsOf(Line line, Point point)
+        {
+            return
+                point.X >= Math.Min(line.Start.X, line.End.X) &&
+                point.X <= Math.Max(line.Start.X, line.End.X) &&
+                point.Y >= Math.Min(line.Start.Y, line.End.Y) &&
+                point.Y <= Math.Max(line.Start.Y, line.End.Y);
+        }
+
         public static Line operator *(Line a, int b)
         {
             return new Line()
