@@ -66,11 +66,11 @@ public partial class MainWindow : Window
         serviceCollection.AddFluffySpoonNeuroEvolution(
             new EvolutionSettings<CarSimulation>()
             {
-                AmountOfGenomesInPopulation = 50,
-                AmountOfWorstGenomesToRemovePerGeneration = 40,
+                AmountOfGenomesInPopulation = 125,
+                AmountOfWorstGenomesToRemovePerGeneration = 100,
                 NeuronCounts = new[] { 7, 6, 2 },
-                MutationProbability = 0.15f,
-                MutationStrength = 0.5f,
+                MutationProbability = 0.1f,
+                MutationStrength = 0.3f,
                 RandomnessProvider = _random,
                 SimulationFactoryMethod = () => new CarSimulation(_map ?? throw new Exception("No map has been generated yet.")),
                 PostTickMethod = RenderGenomes
