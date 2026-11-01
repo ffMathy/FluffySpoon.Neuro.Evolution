@@ -7,12 +7,16 @@
         Icon="/Assets/avalonia-logo.ico"
         Title="FluffySpoon.Neuro.Evolution.Sample">
     <Grid Background="Gray" ColumnDefinitions="*,*,*" RowDefinitions="Auto,*">
-        <Grid Grid.Row="0" Grid.Column="2" RowDefinitions="*,*,*,*">
-            <CheckBox Grid.Column="0" Grid.Row="0" Name="KeepRunningCheckbox" HorizontalAlignment="Center" Margin="12" Checked="KeepRunningCheckbox_Checked" Unchecked="KeepRunningCheckbox_Unchecked">Keep running</CheckBox>
-            <Button Grid.Row="3" Grid.Column="0" Name="GenerateNewMapButton" Click="GenerateNewMapButton_Click" Padding="24">Generate new map</Button>
-            <Button Grid.Column="0" Grid.Row="1" Name="TrainGenerationButton" Click="TrainGenerationButton_Click" Padding="24">Train single generation</Button>
-            <Button Grid.Column="0" Grid.Row="2" Name="TrainMultipleGenerationsButton" Click="TrainMultipleGenerationsButton_Click" Padding="24">Train multiple generations</Button>
-        </Grid>
+        <StackPanel Grid.Row="0" Grid.Column="2" Spacing="12" Margin="12">
+            <CheckBox Name="KeepRunningCheckbox" Checked="KeepRunningCheckbox_Checked" Unchecked="KeepRunningCheckbox_Unchecked">Keep running</CheckBox>
+            <CheckBox Name="GenerateNewMapEachTimeCheckbox">Generate new map each time</CheckBox>
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock VerticalAlignment="Center">Generations to train each time</TextBlock>
+                <TextBox Name="GenerationsTextBox" Text="1" Width="100" />
+            </StackPanel>
+            <Button Name="TrainButton" Click="TrainButton_Click" Padding="24">Train</Button>
+            <Button Name="GenerateNewMapButton" Click="GenerateNewMapButton_Click" Padding="24">Generate new map</Button>
+        </StackPanel>
         <Canvas Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="1" Name="MapCanvas">
             <Canvas.RenderTransform>
                 <ScaleTransform ScaleX="1" ScaleY="1" />

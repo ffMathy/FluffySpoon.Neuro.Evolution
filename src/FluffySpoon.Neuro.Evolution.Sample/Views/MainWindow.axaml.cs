@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Interactivity;
@@ -24,6 +25,9 @@ public partial class MainWindow : Window
 
     private bool _keepRunning;
     private bool _render;
+    private bool _isTraining;
+    private bool _isGenerationsTextValid;
+    private int _generationsPerBatch = 1;
     private int _mapElementCount;
 
     private Map? _map;
@@ -38,6 +42,10 @@ public partial class MainWindow : Window
 
         InitializeComponent();
         SetMap(_mapGeneratorService.PickRandomPredefinedMap());
+
+        GenerationsTextBox
+            .GetObservable(TextBox.TextProperty)
+            .Subscribe(GenerationsTextBox_TextChanged);
 
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddFluffySpoonNeuroEvolution(
@@ -84,6 +92,11 @@ public partial class MainWindow : Window
 
     private void GenerateNewMapButton_Click(object sender, RoutedEventArgs e)
     {
+        GenerateNewMap();
+    }
+
+    private void GenerateNewMap()
+    {
         SetMap(_mapGeneratorService.GenerateRandomMap());
 
         // The next generation's simulations were already created on the previous map.
@@ -95,29 +108,30 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void TrainGenerationButton_Click(object sender, RoutedEventArgs e)
+    private async void TrainButton_Click(object sender, RoutedEventArgs e)
     {
-        await TrainAsync(1);
-    }
-
-    private async void TrainMultipleGenerationsButton_Click(object sender, RoutedEventArgs e)
-    {
-        await TrainAsync(10);
+        await TrainAsync();
     }
 
     /// <summary>
     /// Trains on a background thread so that the UI stays responsive, drawing only the last generation of each batch.
     /// The buttons are disabled meanwhile, since only one training run can evolve the current generation,
     /// and since a new map would otherwise be picked up halfway through creating the next generation.
+    /// The settings are read before each batch, so they can be changed while it keeps running.
     /// </summary>
-    private async Task TrainAsync(int generationsPerBatch)
+    private async Task TrainAsync()
     {
-        SetButtonsEnabled(false);
+        _isTraining = true;
+        UpdateButtons();
 
         try
         {
             do
             {
+                if (GenerateNewMapEachTimeCheckbox.IsChecked == true)
+                    GenerateNewMap();
+
+                var generationsPerBatch = _generationsPerBatch;
                 await Task.Run(() =>
                 {
                     for (var i = 0; i < generationsPerBatch; i++)
@@ -130,15 +144,27 @@ public partial class MainWindow : Window
         }
         finally
         {
-            SetButtonsEnabled(true);
+            _isTraining = false;
+            UpdateButtons();
         }
     }
 
-    private void SetButtonsEnabled(bool isEnabled)
+    /// <summary>
+    /// Invalid text keeps the last valid amount, which a running training session continues with.
+    /// </summary>
+    private void GenerationsTextBox_TextChanged(string? text)
     {
-        TrainGenerationButton.IsEnabled = isEnabled;
-        TrainMultipleGenerationsButton.IsEnabled = isEnabled;
-        GenerateNewMapButton.IsEnabled = isEnabled;
+        _isGenerationsTextValid = int.TryParse(text, out var generations) && generations > 0;
+        if (_isGenerationsTextValid)
+            _generationsPerBatch = generations;
+
+        UpdateButtons();
+    }
+
+    private void UpdateButtons()
+    {
+        TrainButton.IsEnabled = !_isTraining && _isGenerationsTextValid;
+        GenerateNewMapButton.IsEnabled = !_isTraining;
     }
 
     private void SetMap(Map map)
