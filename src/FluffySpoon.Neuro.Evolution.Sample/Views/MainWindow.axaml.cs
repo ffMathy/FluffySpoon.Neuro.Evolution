@@ -41,10 +41,10 @@ public partial class MainWindow : Window
         serviceCollection.AddFluffySpoonNeuroEvolution(
             new EvolutionSettings<CarSimulation>()
             {
-                AmountOfGenomesInPopulation = 3,
-                AmountOfWorstGenomesToRemovePerGeneration = 1,
-                NeuronCounts = new[] { 7, 5, 2 },
-                MutationProbability = 0.05f,
+                AmountOfGenomesInPopulation = 50,
+                AmountOfWorstGenomesToRemovePerGeneration = 40,
+                NeuronCounts = new[] { 7, 6, 2 },
+                MutationProbability = 0.15f,
                 MutationStrength = 0.5f,
                 RandomnessProvider = _random,
                 SimulationFactoryMethod = () => new CarSimulation(_map ?? throw new Exception("No map has been generated yet.")),
@@ -270,7 +270,7 @@ public partial class MainWindow : Window
 
     private async void TrainMultipleGenerationsButton_Click(object sender, RoutedEventArgs e)
     {
-        while (_keepRunning)
+        do
         {
             const int generationsToRun = 10;
             for (var i = 0; i < generationsToRun; i++)
@@ -280,7 +280,7 @@ public partial class MainWindow : Window
             }
 
             await Task.Delay(100);
-        }
+        } while (_keepRunning);
     }
 
     private void KeepRunningCheckbox_Checked(object sender, RoutedEventArgs e)

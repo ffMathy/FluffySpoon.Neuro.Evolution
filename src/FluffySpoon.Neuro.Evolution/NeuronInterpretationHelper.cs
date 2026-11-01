@@ -1,28 +1,24 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace FluffySpoon.Neuro.Evolution;
 
+/// <summary>
+/// Helpers for converting neural network outputs (which are in the range [0, 1]) into meaningful values and back.
+/// </summary>
 public static class NeuronInterpretationHelper
 {
-    public static TEnum InterpretAsEnum<TEnum>(double neuronInput) where TEnum : Enum
+    public static TEnum InterpretAsEnum<TEnum>(double neuronOutput) where TEnum : Enum
     {
         var allEnums = GetEnumValues<TEnum>();
-        var threshold = 1d / allEnums.Count;
-
-        for (var i = threshold; i < 1; i += threshold)
-        {
-            if (neuronInput < i)
-                return allEnums[(int)(i * allEnums.Count + threshold / 2d)];
-        }
-
-        return allEnums[allEnums.Count - 1];
+        var index = (int)(neuronOutput * allEnums.Count);
+        return allEnums[Math.Clamp(index, 0, allEnums.Count - 1)];
     }
 
-    public static bool InterpretAsBoolean(double neuronInput)
+    public static bool InterpretAsBoolean(double neuronOutput)
     {
-        return neuronInput > 0.5;
+        return neuronOutput > 0.5;
     }
 
     public static double ConvertEnumToNeuronInput<TEnum>(TEnum enumValue) where TEnum : Enum

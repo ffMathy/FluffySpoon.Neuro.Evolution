@@ -3,7 +3,7 @@ using FluffySpoon.Neuro.Evolution.Infrastructure.Settings;
 
 namespace FluffySpoon.Neuro.Evolution.Domain.Genomics;
 
-class GenomeFactory<TSimulation> : IGenomeFactory<TSimulation> where TSimulation : ISimulation
+public class GenomeFactory<TSimulation> : IGenomeFactory<TSimulation> where TSimulation : ISimulation
 {
     private readonly INeuralNetworkFactory _neuralNetworkFactory;
     private readonly IEvolutionSettings<TSimulation> _evolutionSettings;
